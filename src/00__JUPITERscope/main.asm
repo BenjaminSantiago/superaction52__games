@@ -27,9 +27,9 @@
 ; $210B --> BG12NBA
 ; $2115 --> VMAIN
 ; $2116 --> VADDRL
-; $2105
-; $212C
-; $4200
+; $2105 --> BGMODE
+; $212C --> TM 
+; $4200 --> NMITIMEN
 ;------------------------------------------
 
 ;where to put this section of code
@@ -95,9 +95,6 @@ loop_for_bg:
 
     lda #$0F
     sta $2100           ; Turn on screen, full Brightness
-
-    lda #%10000000
-    sta $4200       ;<--"Counter Enable" register this bit pattern enables NMI
 
 ;loop
 ;------------------------------------------
