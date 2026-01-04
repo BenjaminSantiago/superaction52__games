@@ -1,3 +1,7 @@
+; from BAZZ
+; https://wiki.superfamicom.org/working-with-vram-loading-the-palette 
+; probably want to put these into main includes
+
 ;============================================================================
 ; Macros
 ;============================================================================

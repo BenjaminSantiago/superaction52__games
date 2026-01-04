@@ -3,8 +3,8 @@
 .INCLUDE "inc/header.inc"   ;<-- header for this ROM, must be first
 
 ;universal includes
-.INCLUDE "../../__inc/registers.inc"
-.INCLUDE "../../__inc/init_snes.inc"
+.INCLUDE "../__inc/registers.inc"
+.INCLUDE "../__inc/init_snes.inc"
 
 .INCLUDE "inc/LoadGraphics.asm"
 

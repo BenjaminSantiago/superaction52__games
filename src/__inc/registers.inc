@@ -4,7 +4,7 @@
 .EQU CG_Addr	$2121
 .EQU CG_Data	$2122
 
-Backgrounds
+;Backgrounds
 ;----------------------------------------
 .EQU BG_mode	$2105
 
