@@ -1,0 +1,8 @@
+unverified
+
+cartridge region=NTSC
+  rom name=program.rom size=0x40000
+  map id=rom address=00-7f,80-ff:8000-ffff mask=0x8000
+
+information
+  title: 20260106__PM125647__DEBUG__JUPITER-SCOPE-v01--

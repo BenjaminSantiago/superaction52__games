@@ -114,7 +114,7 @@ loop_for_bg:
     sta $0000
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 32 - 32)
+    lda #(-32)
     sta $0001
     
     ;first tile
@@ -133,7 +133,7 @@ loop_for_bg:
     sta $0004
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 32 - 32)
+    lda #(-32)
     sta $0005
     
     ;first tile
@@ -144,7 +144,7 @@ loop_for_bg:
     sta $0007
     ;----------------------------
 
-        ;----------------------
+    ;----------------------
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
@@ -152,7 +152,7 @@ loop_for_bg:
     sta $0008
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 32 - 16)
+    lda #(-16)
     sta $0009
     
     ;first tile
@@ -171,7 +171,7 @@ loop_for_bg:
     sta $000C
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 32 - 16)
+    lda #(-16)
     sta $000D
     
     ;first tile
@@ -190,7 +190,7 @@ loop_for_bg:
     sta $0010
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 32)
+    lda #(00)
     sta $0011
     
     ;first tile
@@ -209,7 +209,7 @@ loop_for_bg:
     sta $0014
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 32)
+    lda #(00)
     sta $0015
     
     ;first tile
@@ -228,7 +228,7 @@ loop_for_bg:
     sta $0018
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 16)
+    lda #$10
     sta $0019
     
     ;first tile
@@ -247,7 +247,7 @@ loop_for_bg:
     sta $001C
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 16)
+    lda #$10
     sta $001D
     
     ;first tile
@@ -258,16 +258,67 @@ loop_for_bg:
     sta $001F
     ;----------------------------        
     ;enable 9th x-bits
-    lda #%00000010
+    lda #%00000000
     sta $0200
+    lda #%00000000
+    sta $0201
     
     ; Setup Video modes and other stuff, then turn on the screen
     jsr SetupVideo
+    
+    lda #$80
+    sta $4200 ;Enable NMI
+
+    lda #%01100010      ;8x8 and 16x16 sprites (obj size #0)
+    sta $2101
+
+    lda #%00010001      ;Enable BG1
+    sta $212C
+    
+    lda #$0F
+    sta $2100           ;Turn on screen, full Brightness
 
 
 ;loop
 ;------------------------------------------
 forever:
+    wai 
+
+    lda $0001
+    adc #$02
+    sta $0001
+
+    lda $0005
+    adc #$02
+    sta $0005
+
+    lda $0009
+    adc #$02
+    sta $0009
+
+    lda $000D
+    adc #$02
+    sta $000D
+
+    lda $0011
+    adc #$02
+    sta $0011
+
+    lda $0015
+    adc #$02
+    sta $0015
+
+    lda $0019
+    adc #$02
+    sta $0019
+
+    lda $001D
+    adc #$02
+    sta $001D
+
+
+
+
 
     jmp forever
 
@@ -284,29 +335,22 @@ SpriteInit:
 	rep	#$30	;16bit mem/A, 16 bit X/Y
 	
 	ldx #$0000
-    lda #$0001
+    lda #$F001
 _setoffscr:
     sta $0000,X
     inx
-        sta $0000,X
     inx
-        sta $0000,X
     inx
-        sta $0000,X
     inx
-        sta $0000,X
     cpx #$0200
     bne _setoffscr
 ;-------------------
-	ldx #$0000
 	lda #$5555
 _clr:
-	sta $0200, X		;initialize all sprites to be off the screen
+	sta $0000, X		;initialize all sprites to be off the screen
 	inx
-    sta $0200, X
-	inx
-    sta $0200, X
-	cpx #$0020
+    inx
+	cpx #$0220
 	bne _clr
 ;-------------------
 
@@ -335,7 +379,7 @@ SetupVideo:
 	stz $4302
     stz $4303		; source offset
 
-	LDY #$0100
+	LDY #$0220
 	STY $4305		; number of bytes to transfer
 
 	LDA #$7E
@@ -343,20 +387,29 @@ SetupVideo:
 
 	LDA #$01
 	STA $420B		;start DMA transfer
-	
-
-	lda #%01100010      ;8x8 and 16x16 sprites (obj size #0)
-    sta $2101
-
-    lda #%00010001      ;Enable BG1
-    sta $212C
-    
-    lda #$0F
-    sta $2100           ;Turn on screen, full Brightness
 
     plp
     rts
 
+
+;NMI (vblank) code
+;---------------------------------------------------------------
+VBlank:
+	pha
+	phx
+	phy
+    
+    rep #$10    
+    sep #$20
+    
+    jsr SetupVideo
+
+	PLY 
+	PLX 
+	PLA 
+
+    sep #$20
+    RTI
 .ENDS
 
 ; DATA
