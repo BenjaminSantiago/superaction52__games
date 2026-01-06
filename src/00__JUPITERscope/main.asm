@@ -55,7 +55,7 @@ Start:
     ;8 * bits per pixel * number of characters so we have
     ;8 * 4 * 896 = 28672 = 0x7000
 
-    LoadBlockToVRAM JUPITERscope__bg01__image, $0010, $7000	
+    LoadBlockToVRAM JUPITERscope__bg01__image, $0000, $7000	
 
     ; Load tile map data to VRAM
     ; ---------------------------------
@@ -99,7 +99,7 @@ loop_for_bg:
     LoadPalette meteor__01__palette, 128, 16
 
     ;load tiles to VRAM
-    LoadBlockToVRAM meteor__01__image, $0000, $400
+    LoadBlockToVRAM meteor__01__image, $4000, $400
 
     ;initialize sprites
     ;---------------------------------------------
@@ -110,20 +110,18 @@ loop_for_bg:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2 - 8)
+    lda #(256/2 - 16)
     sta $0000
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 8)
+    lda #(224/2 - 32 - 32)
     sta $0001
     
     ;first tile
     lda #$00
     sta $0002
-
-    ;sprite_byte_3.b6   --> horizontal flip
-    ;sprite_byte_3.b4-5 --> sprite priority 3 (above bgs?)
-    lda #%00110001
+    
+    lda #%00110000
     sta $0003
     ;----------------------------
 
@@ -135,19 +133,130 @@ loop_for_bg:
     sta $0004
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(224/2 - 8)
+    lda #(224/2 - 32 - 32)
     sta $0005
     
     ;first tile
     lda #$02
     sta $0006
-
-    ;sprite_byte_3.b6   --> horizontal flip
-    ;sprite_byte_3.b4-5 --> sprite priority 3 (above bgs?)
-    lda #%0011001
+    
+    lda #%00110000
     sta $0007
     ;----------------------------
 
+        ;----------------------
+    ;initialize sprite properties
+    ;center sprite 
+    ;set x (screen *.5 / width of sprite)
+    lda #(256/2 - 16)
+    sta $0008
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #(224/2 - 32 - 16)
+    sta $0009
+    
+    ;first tile
+    lda #$04
+    sta $000A
+    
+    lda #%00110000
+    sta $000B
+    ;----------------------------
+
+    ;----------------------
+    ;initialize sprite properties
+    ;center sprite 
+    ;set x (screen *.5 / width of sprite)
+    lda #(256/2)
+    sta $000C
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #(224/2 - 32 - 16)
+    sta $000D
+    
+    ;first tile
+    lda #$06
+    sta $000E
+    
+    lda #%00110000
+    sta $000F
+    ;----------------------------
+
+    ;----------------------
+    ;initialize sprite properties
+    ;center sprite 
+    ;set x (screen *.5 / width of sprite)
+    lda #(256/2 - 16)
+    sta $0010
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #(224/2 - 32)
+    sta $0011
+    
+    ;first tile
+    lda #$08
+    sta $0012
+    
+    lda #%00110000
+    sta $0013
+    ;----------------------------
+
+    ;----------------------
+    ;initialize sprite properties
+    ;center sprite 
+    ;set x (screen *.5 / width of sprite)
+    lda #(256/2)
+    sta $0014
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #(224/2 - 32)
+    sta $0015
+    
+    ;first tile
+    lda #$0A
+    sta $0016
+    
+    lda #%00110000
+    sta $0017
+    ;----------------------------
+
+    ;----------------------
+    ;initialize sprite properties
+    ;center sprite 
+    ;set x (screen *.5 / width of sprite)
+    lda #(256/2 - 16)
+    sta $0018
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #(224/2 - 16)
+    sta $0019
+    
+    ;first tile
+    lda #$0C
+    sta $001A
+    
+    lda #%00110000
+    sta $001B
+    ;----------------------------
+
+    ;----------------------
+    ;initialize sprite properties
+    ;center sprite 
+    ;set x (screen *.5 / width of sprite)
+    lda #(256/2)
+    sta $001C
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #(224/2 - 16)
+    sta $001D
+    
+    ;first tile
+    lda #$0E
+    sta $001E
+    
+    lda #%00110000
+    sta $001F
+    ;----------------------------        
     ;enable 9th x-bits
     lda #%00000010
     sta $0200
@@ -159,6 +268,7 @@ loop_for_bg:
 ;loop
 ;------------------------------------------
 forever:
+
     jmp forever
 
 
@@ -178,9 +288,13 @@ SpriteInit:
 _setoffscr:
     sta $0000,X
     inx
+        sta $0000,X
     inx
+        sta $0000,X
     inx
+        sta $0000,X
     inx
+        sta $0000,X
     cpx #$0200
     bne _setoffscr
 ;-------------------
@@ -189,7 +303,9 @@ _setoffscr:
 _clr:
 	sta $0200, X		;initialize all sprites to be off the screen
 	inx
+    sta $0200, X
 	inx
+    sta $0200, X
 	cpx #$0020
 	bne _clr
 ;-------------------
@@ -229,7 +345,7 @@ SetupVideo:
 	STA $420B		;start DMA transfer
 	
 
-	lda #%01100000      ;8x8 and 16x16 sprites (obj size #0)
+	lda #%01100010      ;8x8 and 16x16 sprites (obj size #0)
     sta $2101
 
     lda #%00010001      ;Enable BG1
