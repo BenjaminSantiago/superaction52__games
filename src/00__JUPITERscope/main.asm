@@ -282,43 +282,47 @@ loop_for_bg:
 ;loop
 ;------------------------------------------
 forever:
-    wai 
+    wai
 
+    clc 
     lda $0001
     adc #$02
     sta $0001
 
+    clc 
     lda $0005
     adc #$02
     sta $0005
 
+    clc 
     lda $0009
     adc #$02
     sta $0009
 
+    clc 
     lda $000D
     adc #$02
     sta $000D
 
+    clc 
     lda $0011
     adc #$02
     sta $0011
 
+    clc 
     lda $0015
     adc #$02
     sta $0015
 
+    clc 
     lda $0019
     adc #$02
     sta $0019
 
+    clc 
     lda $001D
     adc #$02
     sta $001D
-
-
-
-
 
     jmp forever
 
@@ -373,21 +377,27 @@ SetupVideo:
     ;transfer sprite data into OAM
     ;----------------------------------
 
-	LDY #$0400
-	STY $4300		; CPU -> PPU, auto increment, write 1 reg, $2104 (OAM Write)
+    ; DMA params
+    LDA #$00
+    STA $4300      ; DMAP
 
-	stz $4302
-    stz $4303		; source offset
+    LDA #$04
+    STA $4301      ; BBAD = $2104
 
-	LDY #$0220
-	STY $4305		; number of bytes to transfer
+    LDA #$00
+    STA $4302
+    STA $4303      ; source offset
 
-	LDA #$7E
-	STA $4304		; bank address = $7E  (work RAM)
+    LDA #$7E
+    STA $4304      ; source bank
 
-	LDA #$01
-	STA $420B		;start DMA transfer
+    LDA #$20
+    STA $4305
+    LDA #$02
+    STA $4306      ; $0220 bytes
 
+    LDA #$01
+    STA $420B      ; start DMA
     plp
     rts
 
@@ -402,13 +412,30 @@ VBlank:
     rep #$10    
     sep #$20
     
-    jsr SetupVideo
+    stz $4300
+
+    lda #$04
+    sta $4301
+
+    lda #$00
+    sta $4302
+    sta $4303
+
+    lda #$7E
+    sta $4304
+
+    lda #$20
+    sta $4305
+    lda #$02
+    sta $4306
+
+    lda #$01
+    sta $420B
 
 	PLY 
 	PLX 
 	PLA 
 
-    sep #$20
     RTI
 .ENDS
 
