@@ -37,6 +37,26 @@
 
 .equ REG_DISPCNT 	$2100
 .equ REG_OBSEL		$2101
+;7  bit  0
+;---- ----
+;SSSN NbBB
+;|||| ||||
+;|||| |+++- Name base address (word address = bBB << 13)
+;|||+-+---- Name select (word offset = (NN+1) << 12)
+;+++------- Object size:
+;            000:  8x8  and 16x16
+;            001:  8x8  and 32x32
+;            010:  8x8  and 64x64
+;            011: 16x16 and 32x32
+;            100: 16x16 and 64x64
+;            101: 32x32 and 64x64
+;            110: 16x32 and 32x64
+;            111: 16x32 and 32x32
+;Name base address selects a 16 KiB-aligned quarter of VRAM for the first 8 KiB of available sprite tiles. Bit 2 was reserved for a planned but never implemented expansion to 128 KiB VRAM, so is normally 0.
+;Name select controls a relative offset from the name base address in NN+1 8 KiB increments, selecting a second 8 KiB of available sprite tiles. With name select of 0, the second half follows the base 8 KiB contiguously.
+;Object size controls the sizes available for sprites. The two modes featuring rectangular sizes (6, 7) were not documented by the SNES development manual.
+;Fullsnes refers to this register as OBSEL.
+
 .equ REG_DISPMODE	$2105
 
 .equ REG_BG0MAP 	$2107
