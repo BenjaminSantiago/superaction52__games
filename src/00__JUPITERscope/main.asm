@@ -31,6 +31,7 @@
 ; $212C --> TM 
 ; $4200 --> NMITIMEN
 
+;   controller registers
 ;   JOY1H       JOY1L
 ;   $4219       $4218
 ;15  bit  8   7  bit  0
@@ -43,9 +44,7 @@
 ; |||| ++++------------- D-pad
 ; ||++------------------ Select (s) and Start (S)
 ; ++-------------------- B/Y buttons
-
 ;------------------------------------------
-
 
 ; VARIABLES 
 ;------------------------------------------
@@ -54,11 +53,23 @@
 .EQU joy1H__p $0222
 .EQU joy1H__h $0223
 
-
 .EQU ship__speed    $0224
 .EQU meteor__speed  $0225
 .EQU bullet__speed  $0226
 .EQU bullet__firing $0227
+
+;wait counter for new meteors
+.EQU meteor__count  $0229
+.EQU meteor__moving $0230
+.EQU wait__c        $0228
+
+.EQU sploder_x      $023A
+.EQU sploder_y      $023B
+.EQU sploder_timer  $023C
+.EQU sploder_timer_on $023D
+
+.EQU rng            $023E
+
 ;------------------------------------------
 
 ;where to put this section of code
@@ -77,13 +88,21 @@ Start:
     lda #$04
     sta ship__speed
 
-    lda #$02
+    lda #$01
     sta meteor__speed
 
     lda #$08
     sta bullet__speed
 
     stz bullet__firing
+    stz wait__c
+    stz meteor__count
+    stz meteor__moving
+    stz sploder_x
+    stz sploder_y
+    stz sploder_timer
+    stz sploder_timer_on
+    stz rng
     ;--------------------------------
 
     ; Load Palette to VRAM
@@ -145,6 +164,8 @@ loop_for_bg:
     LoadBlockToVRAM ship__palette, $4200, $800    
     LoadPalette fireball__palette, 160, 16
     LoadBlockToVRAM fireball__palette, $4600, $400
+    LoadPalette sploder__palette, 176, 16
+    LoadBlockToVRAM sploder__image, $4800, $800
 
     ;initialize sprites
     ;---------------------------------------------
@@ -346,13 +367,13 @@ loop_for_bg:
     sta $0200
     lda #%00000000
     sta $0201
-    lda #%01010110
+    lda #%01110110
     sta $0202
 
     lda #$81
-    sta $4200 ;Enable NMI + enable joy pad
+    sta $4200               ;Enable NMI + enable joy pad
 
-    lda #%01100010      ;8x8 and 16x16 sprites (obj size #0)
+    lda #%01100010          ;16x16 and 32x32 sprites 
     sta $2101
 
     ; Setup Video modes and other stuff, then turn on the screen
@@ -364,57 +385,125 @@ loop_for_bg:
     lda #$0F
     sta $2100           ;Turn on screen, full Brightness
 
+    ;initialize randomness
+    lda $4210
+    sta rng
 
 ;loop
 ;------------------------------------------
 forever:
     wai
 
-    ; move meteor(s)
-    ;-------------------
+    ;refresh the rng
+    ;-----------------------------------------
+    lda rng
+    asl 
+    bcc +
+    eor #$1D
++
+    sta rng
+    ;-----------------------------------------
+    ;check if there is a sploder timer
+    lda sploder_timer_on
+    cmp #$01
+    bne meteor__canMOVE
+
+    ; incrememt if it is on
+    inc sploder_timer
+
+    ; check if it is at it's max
+    lda sploder_timer
+    cmp #$04
+    bne meteor__canMOVE
+
+    ; if it is, turn the sprite back on
+    lda $0202
+    eor #%00010000
+    sta $0202
+
+    ; and reset timer and flag
+    stz sploder_timer
+    stz sploder_timer_on
+
+    ;check if the meteor can move
+meteor__canMOVE:
+    lda wait__c
+    cmp #$10
+    bne +
+
+    ;meteor is ready to move
+    ;show the front half
+    stz $0201
+
+    lda #$01
+    sta meteor__moving
+
+    bra move__meteor
++   
+    inc wait__c
+    jmp move__bullet
+
+move__meteor:
+    lda meteor__moving
+    cmp #$01
+    beq + 
+
+    jmp move__bullet
+
++
+    lda $0001    
     clc 
-    lda $0001
-    adc #$02
+    adc meteor__speed
     sta $0001
 
-    clc 
     lda $0005
-    adc #$02
+    clc 
+    adc meteor__speed
     sta $0005
 
-    clc 
+    ;check 11 right quick
+    lda $0011
+    cmp #$00
+    bcc + 
+
+    stz $0200
+
++
     lda $0009
-    adc #$02
+    clc 
+    adc meteor__speed
     sta $0009
 
-    clc 
     lda $000D
-    adc #$02
+    clc 
+    adc meteor__speed
     sta $000D
-
-    clc 
+    
     lda $0011
-    adc #$02
+    clc 
+    adc meteor__speed
     sta $0011
-
-    clc 
+    
     lda $0015
-    adc #$02
-    sta $0015
-
     clc 
+    adc meteor__speed
+    sta $0015
+    
     lda $0019
-    adc #$02
+    clc 
+    adc meteor__speed
     sta $0019
 
-    clc 
     lda $001D
-    adc #$02
+    clc 
+    adc meteor__speed
     sta $001D
     ;-------------------
 
+
     ; move bullets
     ;-------------------
+move__bullet:
     lda bullet__firing
     cmp #$01
     beq +
@@ -434,12 +523,21 @@ forever:
     cmp #$F0
     bcs +
 
-    bra _check_y
+    bra _check_y__1
 
 +   jmp _reset_bullet
 
     ; check collisions between bullet and meteor 
-    ; if bullet y <= meteor bottom sprite y
+    ; check onscreen
+    ; this isn't working possibly?
+_check_onscreen:
+    lda $0200
+    cmp #%00000000
+    beq _check_y__1
+
+    jmp _left_check
+
+    ; if bullet y <= meteor bottom sprite y 
 _check_y__1:
     lda $0025
     sec
@@ -449,11 +547,11 @@ _check_y__1:
 
     jmp _left_check
 
-    ; if bullex x >= meteor x
+    ; if bullex x + width >= meteor x
 _check_x__1:
     lda $0024
-    sec 
-    sbc #$10
+    clc
+    adc #$10
     cmp $0018
     bcs _check_x__2
 
@@ -462,16 +560,66 @@ _check_x__1:
     ; if bullet x <= meteor x + width
 _check_x__2:
     lda $0024
-    clc 
-    adc #$20
+    sec
+    sbc #$20
     cmp $0018
-    bcc _bullet_plus_meteor
+    bcc _show_sploder
     ;-------------------
     jmp _left_check
 
-_bullet_plus_meteor:
-    ;reset meteor parts
-    
+_show_sploder:
+    lda $0024
+    sec 
+    sbc #$08
+    sta sploder_x
+    sta $0028
+
+    lda $0025
+    sta sploder_y
+    sta $0029
+
+    lda #$80
+    sta $002A
+
+    lda #%00100110
+    sta $002B
+
+    lda $0202
+    and #%11101111
+    sta $0202
+
+    lda #$01
+    sta sploder_timer_on
+
+_reset_meteor:
+    ; deal with the counter & speed
+
+    ;compare to max speed
+    lda meteor__speed
+    cmp #$10
+    beq meteor_moving_counter_reset
+
+    lda meteor__count
+    cmp #$08
+    bcc + 
+
+    stz meteor__count 
+    inc meteor__speed
+    bra meteor_moving_counter_reset
+
++
+    inc meteor__count
+
+meteor_moving_counter_reset:
+    ; reset wait counter & flag
+    stz wait__c
+    stz meteor__moving
+
+    ; put meteor off screen
+    lda #%01010101
+    sta $0200
+    sta $0201
+        
     ; SPRITES THAT COMPOSE THE METEOR
     ; just do 32x32? 
     ; re-export the images
@@ -481,11 +629,12 @@ _bullet_plus_meteor:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2 - 16)
+    lda rng
+    and #$DF
     sta $0000
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(-32)
+    lda #(-64)
     sta $0001
     
     ;first tile
@@ -500,11 +649,14 @@ _bullet_plus_meteor:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2)
+    lda rng
+    and #$DF
+    clc
+    adc #$10
     sta $0004
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(-32)
+    lda #(-64)
     sta $0005
     
     ;first tile
@@ -519,11 +671,12 @@ _bullet_plus_meteor:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2 - 16)
+    lda rng
+    and #$DF
     sta $0008
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(-16)
+    lda #(-48)
     sta $0009
     
     ;first tile
@@ -538,11 +691,14 @@ _bullet_plus_meteor:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2)
+    lda rng
+    and #$DF
+    clc
+    adc #$10
     sta $000C
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(-16)
+    lda #(-48)
     sta $000D
     
     ;first tile
@@ -557,11 +713,12 @@ _bullet_plus_meteor:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2 - 16)
+    lda rng
+    and #$DF
     sta $0010
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(00)
+    lda #(-32)
     sta $0011
     
     ;first tile
@@ -576,11 +733,14 @@ _bullet_plus_meteor:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2)
+    lda rng
+    and #$DF
+    clc
+    adc #$10
     sta $0014
     
     ;set y (screen.height * .5/height of sprite)
-    lda #(00)
+    lda #(-32)
     sta $0015
     
     ;first tile
@@ -595,11 +755,12 @@ _bullet_plus_meteor:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2 - 16)
+    lda rng 
+    and #$DF   
     sta $0018
     
     ;set y (screen.height * .5/height of sprite)
-    lda #$10
+    lda #(-16)
     sta $0019
     
     ;first tile
@@ -614,11 +775,14 @@ _bullet_plus_meteor:
     ;initialize sprite properties
     ;center sprite 
     ;set x (screen *.5 / width of sprite)
-    lda #(256/2)
+    lda rng
+    and #$DF
+    clc
+    adc #$10
     sta $001C
     
     ;set y (screen.height * .5/height of sprite)
-    lda #$10
+    lda #(-16)
     sta $001D
     
     ;first tile
@@ -886,5 +1050,9 @@ VBlank:
 
     fireball__image:
         .incbin "_graphics/fireball__v01.pic"
+    sploder__palette:
+        .incbin "_graphics/sploder.clr"        
+    sploder__image:
+        .incbin "_graphics/sploder.pic"
 .ENDS
 ;------------------------------------------
