@@ -461,14 +461,7 @@ move__meteor:
     adc meteor__speed
     sta $0005
 
-    ;check 11 right quick
-    lda $0011
-    cmp #$00
-    bcc + 
-
-    stz $0200
-
-+
+    
     lda $0009
     clc 
     adc meteor__speed
@@ -498,6 +491,19 @@ move__meteor:
     clc 
     adc meteor__speed
     sta $001D
+
+    ;check bottom-most sprite is on scree right quick
+    lda $0019
+    cmp #$10
+    bcc + 
+
+    lda $0019
+    cmp #$EF
+    bcs +
+
+    stz $0200
+
++
     ;-------------------
 
 
