@@ -451,47 +451,33 @@ move__meteor:
     jmp move__bullet
 
 +
+    ; we can do two values at a time
+    ; because there are two 16x16 sprites
+    ; per line (with the same y value)
     lda $0001    
     clc 
     adc meteor__speed
     sta $0001
-
-    lda $0005
-    clc 
-    adc meteor__speed
     sta $0005
 
-    
     lda $0009
     clc 
     adc meteor__speed
     sta $0009
-
-    lda $000D
-    clc 
-    adc meteor__speed
     sta $000D
-    
+      
     lda $0011
     clc 
     adc meteor__speed
     sta $0011
-    
-    lda $0015
-    clc 
-    adc meteor__speed
     sta $0015
     
     lda $0019
     clc 
     adc meteor__speed
     sta $0019
-
-    lda $001D
-    clc 
-    adc meteor__speed
     sta $001D
-
+    
     ;check bottom-most sprite is on scree right quick
     lda $0019
     cmp #$10
@@ -502,10 +488,8 @@ move__meteor:
     bcs +
 
     stz $0200
-
 +
     ;-------------------
-
 
     ; move bullets
     ;-------------------
@@ -535,7 +519,6 @@ move__bullet:
 
     ; check collisions between bullet and meteor 
     ; check onscreen
-    ; this isn't working possibly?
 _check_onscreen:
     lda $0200
     cmp #%00000000
@@ -565,11 +548,11 @@ _check_x__1:
 
     ; if bullet x <= meteor x + width
 _check_x__2:
-    lda $0024
-    sec
-    sbc #$20
-    cmp $0018
-    bcc _show_sploder
+    lda $0018
+    clc
+    adc #$20
+    cmp $0024
+    bcs _show_sploder
     ;-------------------
     jmp _left_check
 
@@ -810,7 +793,50 @@ _reset_bullet:
     sta $0025
     
     ; check collisions between meteors and ship
+_check_collisions_ship_and_meteors:
+    ; check meteor is on screen 
+    lda $0200
+    cmp #%00000000
+    beq _check_SHIP_y__1
+
+    bra left_check
+
+_check_SHIP_y__1:
+    ;check meteor_y (lowest sprite) + height >= ship_y
+    lda $0019
+    clc 
+    adc #$20
+    cmp $0021
+    bcs _check_SHIP_x__1
+
+    jmp _left_check
+
+_check_SHIP_x__1:
+    ;check ship x + width > meteor X
+    lda $0021
+    clc 
+    adc #$20
+    cmp $0018
+    bcs _check_SHIP_X__2
+
+    jmp _left_check
+
+_check_SHIP_X__2:
+    ;check meteor x + width < ship X
+    lda $0018
+    clc 
+    adc #$20
+    cmp $0018
+    bcc _handle_SHIP_collision
+
+    jmp _left_check
+
+_handle_SHIP_collison:
+    ;show sploder
     
+    ;reset meteor
+
+    ;reset ship
 
 ;check directional controls
 ;---------------------------------------------
