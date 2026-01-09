@@ -60,15 +60,19 @@
 
 ;wait counter for new meteors
 .EQU meteor__count  $0229
-.EQU meteor__moving $0230
-.EQU wait__c        $0228
+.EQU meteor__moving $022A
+.EQU wait__c        $022B
 
-.EQU sploder_x      $023A
-.EQU sploder_y      $023B
-.EQU sploder_timer  $023C
-.EQU sploder_timer_on $023D
+.EQU sploder_x          $022C
+.EQU sploder_y          $022D
+.EQU sploder_timer      $022E
+.EQU sploder_timer_on   $022F
 
-.EQU rng            $023E
+.EQU ship_waiting       $0230
+.EQU ship_wait_counter  $0232
+
+
+.EQU rng            $0231
 
 ;------------------------------------------
 
@@ -102,6 +106,10 @@ Start:
     stz sploder_y
     stz sploder_timer
     stz sploder_timer_on
+
+    stz ship_waiting
+    stz ship_wait_counter
+
     stz rng
     ;--------------------------------
 
@@ -400,8 +408,29 @@ forever:
     asl 
     bcc +
     eor #$1D
-+
++   
     sta rng
+
+    ;-----------------------------------------
+    ; check if there is a ship waiting timer
+    lda ship_waiting
+    cmp #%01
+    bne _sploder_checks
+
+    ;inc the timer otherwise
+    inc ship_wait_counter
+
+    lda ship_wait_counter
+    cmp #$20
+    bne _sploder_checks
+
+    stz ship_wait_counter
+    stz ship_waiting
+    jsr reset_ship
+
+    ;-----------------------------------------
+
+_sploder_checks:
     ;-----------------------------------------
     ;check if there is a sploder timer
     lda sploder_timer_on
@@ -478,7 +507,8 @@ move__meteor:
     sta $0019
     sta $001D
     
-    ;check bottom-most sprite is on scree right quick
+    ;check bottom-most sprite is on screen right quick
+    ;(prevent tail from showing at the bottom)
     lda $0019
     cmp #$10
     bcc + 
@@ -489,8 +519,6 @@ move__meteor:
 
     stz $0200
 +
-    ;-------------------
-
     ; move bullets
     ;-------------------
 move__bullet:
@@ -498,7 +526,7 @@ move__bullet:
     cmp #$01
     beq +
 
-    jmp _left_check
+    jmp _check_collisions
 
     ; move the bullet up
 +   lda $0025
@@ -513,18 +541,188 @@ move__bullet:
     cmp #$F0
     bcs +
 
-    bra _check_y__1
+    bra _check_collisions
 
-+   jmp _reset_bullet
++   jsr reset_bullet
 
-    ; check collisions between bullet and meteor 
-    ; check onscreen
-_check_onscreen:
+ _check_collisions:
+    ;this calls:
+        ;the routine to show the appropriate sploder
+        ;the routine to reset the meteor
+    jsr COLLISIONS__bullet_and_meteor    
+
+    jsr COLLISIONS__ship_and_meteor
+
+;check directional controls
+;---------------------------------------------
+_left_check:
+    lda joy1H__h
+    and #%00000010
+    bne +
+
+    bra _right_check
++
+    lda $0020
+    sec
+    sbc ship__speed
+    sta $0020
+
+    ;if carry is clear set 
+    ;x explicitly to zero
+    bcc +
+
+    bra _right_check
+
++   stz $0020
+
+_right_check:
+    lda joy1H__h
+    and #%00000001
+    bne +
+
+    bra _Y_check
++
+    lda $0020
+    clc
+    adc ship__speed
+    sta $0020
+
+    cmp #$E0    
+    bcs +
+
+    bra _Y_check
+
++   lda #$E0
+    sta $0020  
+
+_Y_check:
+    lda joy1H__h
+    and #%01000000
+    bne +
+    
+    jmp forever
++
+    lda ship_waiting
+    cmp #$01
+    bne +
+
+    jmp forever
++
+    lda bullet__firing
+    cmp #$00
+    beq +
+
+    jmp forever
++
+    ; set bit for bullet to be on screen
+    lda $0202
+    and #%11111011  ;explicitly set to on screen
+    sta $0202
+
+    ; set bullet x to be ship x + 8
+    lda $0020
+    clc 
+    adc #$08
+    sta $0024
+
+    lda #$01
+    sta bullet__firing 
+
+    jmp forever
+
+
+;S U B R O U T I N E S
+
+;initialize the sprites to be off-screen
+;(this is only in RAM, still has to be 
+;transferred to the OAM)
+;---------------------------------------------------------------
+SpriteInit:
+	php	
+
+	rep	#$30	;16bit mem/A, 16 bit X/Y
+	
+	ldx #$0000
+    lda #$F001
+_setoffscr:
+    sta $0000,X
+    inx
+    inx
+    inx
+    inx
+    cpx #$0200
+    bne _setoffscr
+;-------------------
+	lda #$5555
+_clr:
+	sta $0000, X		;initialize all sprites to be off the screen
+	inx
+    inx
+	cpx #$0220
+	bne _clr
+;-------------------
+
+	plp
+	rts
+;---------------------------------------------------------------
+
+;set up the "general video"-type registers
+;---------------------------------------------------------------
+SetupVideo:
+    php
+    
+    ;set XY/A
+    rep #$10
+    sep #$20
+    
+    stz $2102
+    stz $2103
+    
+    ;transfer sprite data into OAM
+    ;----------------------------------
+
+    ; DMA params
+    LDA #$00
+    STA $4300      ; DMAP
+
+    LDA #$04
+    STA $4301      ; BBAD = $2104
+
+    LDA #$00
+    STA $4302
+    STA $4303      ; source offset
+
+    LDA #$7E
+    STA $4304      ; source bank
+
+    LDA #$20
+    STA $4305
+    LDA #$02
+    STA $4306      ; $0220 bytes
+
+    LDA #$01
+    STA $420B      ; start DMA
+    ;----------------------------------
+
+    plp
+    rts
+;---------------------------------------------------------------
+
+
+; check collisions between bullet and meteor 
+;---------------------------------------------------------------
+COLLISIONS__bullet_and_meteor:
+    php 
+
+    ; check if the tail is onscreen
+    ; collisions will "work" if these
+    ; flags are set
     lda $0200
     cmp #%00000000
     beq _check_y__1
 
-    jmp _left_check
+    plp
+    rts 
 
     ; if bullet y <= meteor bottom sprite y 
 _check_y__1:
@@ -534,7 +732,8 @@ _check_y__1:
     cmp $0019
     bcc _check_x__1
 
-    jmp _left_check
+    plp
+    rts
 
     ; if bullex x + width >= meteor x
 _check_x__1:
@@ -544,7 +743,8 @@ _check_x__1:
     cmp $0018
     bcs _check_x__2
 
-    jmp _left_check
+    plp
+    rts
 
     ; if bullet x <= meteor x + width
 _check_x__2:
@@ -554,33 +754,71 @@ _check_x__2:
     cmp $0024
     bcs _show_sploder
     ;-------------------
-    jmp _left_check
+
+    plp
+    rts
 
 _show_sploder:
-    lda $0024
-    sec 
-    sbc #$08
-    sta sploder_x
-    sta $0028
+    jsr show_sploder_BULLETandMETEOR
+    jsr reset_bullet
+    jsr reset_meteor
 
-    lda $0025
-    sta sploder_y
-    sta $0029
+    plp
+    rts
+;---------------------------------------------------------------
 
-    lda #$80
-    sta $002A
+;reset the ship! 
+;---------------------------------------------------------------
+reset_ship:
+    php 
 
-    lda #%00100110
-    sta $002B
+    ;SHIP
+    ;----------------------------        
+    ;set x
+    lda #(256/2 - 16)
+    sta $0020
 
-    lda $0202
-    and #%11101111
+    ;set y
+    lda #(180)
+    sta $0021
+
+    ;set sprite #
+    lda #$21
+    sta $0022
+
+    ;set props
+    lda #%00110010
+    sta $0023
+
+    lda #%11111110
+    and $0202
     sta $0202
+    ;----------------------------        
 
-    lda #$01
-    sta sploder_timer_on
+    plp 
+    rts    
+;---------------------------------------------------------------
 
-_reset_meteor:
+;reset if bullet is ready to reset
+;---------------------------------------------------------------
+reset_bullet:
+    php 
+
+    stz bullet__firing
+    lda #%00000100
+    ora $0202
+    sta $0202   ;set off screen
+    lda $0021
+    sta $0025   ;reset y (to ship y)
+
+    plp 
+    rts    
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+reset_meteor:
+    php
+
     ; deal with the counter & speed
 
     ;compare to max speed
@@ -783,208 +1021,146 @@ meteor_moving_counter_reset:
     ;------------------------------------------------------
     ;------------------------------------------------------
 
-    ;reset if bullet is ready to reset
-_reset_bullet:
-    stz bullet__firing
-    lda #%00000100
-    ora $0202
-    sta $0202   ;set off screen
-    lda $0021
-    sta $0025
+    plp
+    rts 
+;---------------------------------------------------------------
+
+
+
+;show the lil sploder
+;---------------------------------------------------------------
+show_sploder_BULLETandMETEOR:
+    php 
+
+    ; get sploder x from bullet x
+    lda $0024
+    sec 
+    sbc #$08
+    sta sploder_x
+    sta $0028
+
+    ; get sploder y from bullet y
+    lda $0025
+    sta sploder_y
+    sta $0029
+
+    ; get the correct sprite
+    lda #$80
+    sta $002A
+
+    ; set props
+    lda #%00100110
+    sta $002B
+
+    ; set high table props
+    lda $0202
+    and #%11101111
+    sta $0202
     
-    ; check collisions between meteors and ship
-_check_collisions_ship_and_meteors:
+    ; activate sploder timer
+    lda #$01
+    sta sploder_timer_on
+
+    plp
+    rts
+;---------------------------------------------------------------
+
+;show the lil sploder
+;---------------------------------------------------------------
+show_sploder_SHIPandMETEOR:
+    php 
+
+    lda $0020
+    sta sploder_x
+    sta $0028
+
+    lda $0021
+    sec 
+    sbc #$10
+    sta sploder_y
+    sta $0029
+
+    lda #$80
+    sta $002A
+
+    lda #%00100110
+    sta $002B
+
+    lda $0202
+    and #%11101111
+    sta $0202
+
+    lda #$01
+    sta sploder_timer_on
+
+    plp
+    rts
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+COLLISIONS__ship_and_meteor:
+    php 
+
     ; check meteor is on screen 
     lda $0200
     cmp #%00000000
     beq _check_SHIP_y__1
 
-    bra left_check
+    plp
+    rts 
 
 _check_SHIP_y__1:
     ;check meteor_y (lowest sprite) + height >= ship_y
     lda $0019
     clc 
-    adc #$20
+    adc #$10
     cmp $0021
     bcs _check_SHIP_x__1
 
-    jmp _left_check
+    plp
+    rts
 
 _check_SHIP_x__1:
     ;check ship x + width > meteor X
-    lda $0021
+    lda $0020
     clc 
     adc #$20
     cmp $0018
     bcs _check_SHIP_X__2
 
-    jmp _left_check
+    plp
+    rts
 
 _check_SHIP_X__2:
     ;check meteor x + width < ship X
     lda $0018
     clc 
     adc #$20
-    cmp $0018
-    bcc _handle_SHIP_collision
+    cmp $0020
+    bcs _handle_SHIP_collision
 
-    jmp _left_check
+    plp
+    rts  
 
-_handle_SHIP_collison:
-    ;show sploder
-    
-    ;reset meteor
+_handle_SHIP_collision:
+    ; set ship to be waiting
+    lda #$01
+    sta ship_waiting
 
-    ;reset ship
-
-;check directional controls
-;---------------------------------------------
-_left_check:
-    lda joy1H__h
-    and #%00000010
-    bne +
-
-    bra _right_check
-+
-    lda $0020
-    sec
-    sbc ship__speed
-    sta $0020
-
-    ;if carry is clear set 
-    ;x explicitly to zero
-    bcc +
-
-    bra _right_check
-
-+   stz $0020
-
-_right_check:
-    lda joy1H__h
-    and #%00000001
-    bne +
-
-    bra _Y_check
-+
-    lda $0020
-    clc
-    adc ship__speed
-    sta $0020
-
-    cmp #$E0    
-    bcs +
-
-    bra _Y_check
-
-+   lda #$E0
-    sta $0020  
-
-_Y_check:
-    lda joy1H__h
-    and #%01000000
-    bne +
-    
-    jmp forever
-+
-    lda bullet__firing
-    cmp #$00
-    beq +
-
-    jmp forever
-+
-    ; set bit for bullet to be on screen
-    lda $0202
-    and #%11111011  ;explicitly set to on screen
+    ; hide ship
+    lda #%00000001
+    ora $0202
     sta $0202
 
-    ; set bullet x to be ship x + 8
-    lda $0020
-    clc 
-    adc #$08
-    sta $0024
+    ;show sploder
+    jsr show_sploder_SHIPandMETEOR
 
-    lda #$01
-    sta bullet__firing 
-
-    jmp forever
-
-
-;S U B R O U T I N E S
-
-;initialize the sprites to be off-screen
-;(this is only in RAM, still has to be 
-;transferred to the OAM)
-;---------------------------------------------------------------
-SpriteInit:
-	php	
-
-	rep	#$30	;16bit mem/A, 16 bit X/Y
-	
-	ldx #$0000
-    lda #$F001
-_setoffscr:
-    sta $0000,X
-    inx
-    inx
-    inx
-    inx
-    cpx #$0200
-    bne _setoffscr
-;-------------------
-	lda #$5555
-_clr:
-	sta $0000, X		;initialize all sprites to be off the screen
-	inx
-    inx
-	cpx #$0220
-	bne _clr
-;-------------------
-
-	plp
-	rts
-;---------------------------------------------------------------
-
-;set up the "general video"-type registers
-;---------------------------------------------------------------
-SetupVideo:
-    php
-    
-    ;set XY/A
-    rep #$10
-    sep #$20
-    
-    stz $2102
-    stz $2103
-    
-    ;transfer sprite data into OAM
-    ;----------------------------------
-
-    ; DMA params
-    LDA #$00
-    STA $4300      ; DMAP
-
-    LDA #$04
-    STA $4301      ; BBAD = $2104
-
-    LDA #$00
-    STA $4302
-    STA $4303      ; source offset
-
-    LDA #$7E
-    STA $4304      ; source bank
-
-    LDA #$20
-    STA $4305
-    LDA #$02
-    STA $4306      ; $0220 bytes
-
-    LDA #$01
-    STA $420B      ; start DMA
-    ;----------------------------------
+    ;reset meteor
+    jsr reset_meteor
 
     plp
     rts
+;---------------------------------------------------------------
 
 
 ;NMI (vblank) code
