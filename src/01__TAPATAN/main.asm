@@ -1,6 +1,6 @@
-;sprite screen collision with sound at edge of screen
-;by Benjamin Santiago
-;(based on bazz example)
+;---------------------------------------------------------------
+; SUPER ACTION 52 --> WEEK 02 --> TAPATAN
+; by Benjamin Santiago
 ;---------------------------------------------------------------
 
 ;includes
@@ -14,23 +14,42 @@
 .INCLUDE "inc/load_graphics.asm"
 
 ;variables
-;---------------------------------------------------------------
-;these two are to determine if the sprite should go 
-;go back or forth in each dimension
-.EQU Y_dir      $0221
-.EQU X_dir      $0222
+;---------------------------------------------------------------'
+.EQU    gameMODE    $0221
 
-;this is a flag to determine if the background 
-;should be blue or not
-.EQU bg_flash   $0223
+; game modes
+;-----------
+; 00 --> title
+; 01 --> options? 
+; 02 --> game -> drop phase
+; 03 --> game -> move phase
+; 04 --> game -> game over
 
-;counter to inc and compare to if bg should be flashing or not
-.EQU bg_c       $0224
+.EQU    BOARD       $0222 ; -> 0224
+.EQU    BOARD_01    $0223
+.EQU    BOARD_02    $0224
+; The BOARD 
+;----------
+; it has 9 locations, 3 rows of 3. 
+; each location is represented by 2 bits 
+; empty         -> 00
+; p1 occupied   -> 01
+; p2 occupied   -> 10
+
+; memory locations
+; $0222         - $0223         - $0224
+; 00 00 00 | 00 - 00 00 | 00 00 - 00
+
+; GAME BOARD ROWS
+;   TOP    | MIDDLE     | BOTTOM
+; 00 00 00 | 00 - 00 00 | 00 00 - 00
+
+.EQU sound_counter $0225
 
 
 
 
-
+; M A I N  C O D E
 ;where the processor goes on reset
 ;---------------------------------------------------------------
 .BANK 0 SLOT 0
@@ -42,14 +61,15 @@ Start:
     InitSNES   
 
     ;"initialize" the "variables"
-    stz X_dir
-    stz Y_dir
-    stz bg_flash
-    stz bg_c
+    ;------------------------------------------------------
+    stz gameMODE
+    stz BOARD
+    stz sound_counter
+    ;------------------------------------------------------
 
     jsr InitSoundCPU
 
-    ;loop to transfer program into the SPC
+     ;loop to transfer program into the SPC
     ;------------------------------------------------------
     ldx #$0000          ;(clear x start counter)
 
@@ -67,8 +87,6 @@ Start:
     inx                 ;increment counter 
     cpx #spcend - spc_program
     bne SoundSendLoop
-    ;------------------------------------------------------
-
 
     ;end transfer
     ;------------------------------------------------------
@@ -86,56 +104,10 @@ Start:
     sta $2140       ;Tell SPC to begin executing its program
     ;------------------------------------------------------
 
-
-
-
     ;A/X/Y width (XY 16-bit & A 8-bit)   
     rep #$10    
     sep #$20
 
-    ;2105       --> BG MODE / character size
-    ;2105.b0    --> bg mode 1
-    ;2015.b3    --> character priority (I think this puts sprites above BGs?)
-    lda #%00001001
-    sta $2105
-
-    ;initial bg color (white $7FFF)
-    stz $2121
-    lda #$FF
-    sta $2122
-    lda #$7F
-    sta $2122
-    
-    ; Load Palette for our tiles
-    LoadPalette sprite_palette, 128, 16     ; Sprite Palettes start at color 128
-
-    ; Load Tile data to VRAM
-    LoadBlockToVRAM sprite, $0000, $0800
-
-    ;put RAM "copy" of sprites offscreen
-    jsr SpriteInit    
-
-    ;initialize sprite properties
-    ;set x (screen *.5 / width of sprite)
-    lda #32
-    sta $0000
-    
-    ;set y (sceen.height * .5/height of sprite)
-    lda #(224/2 - 16)
-    sta $0001
-    
-    ;first tile is zeroth one
-    stz $0002
-
-    ;sprite_byte_3.b6   --> horizontal flip
-    ;sprite_byte_3.b4-5 --> sprite priority 3 (above bgs?)
-    lda #%00110000
-    sta $0003
-    
-    ;enable 9th x-bits
-    lda #%01010100
-    sta $0200
-    
     ; Setup Video modes and other stuff, then turn on the screen
     jsr SetupVideo
 
@@ -144,9 +116,8 @@ Start:
 
 ;main loop
 ;---------------------------------------------------------------
-Infinity:
-    wai 
-
+forever:
+    wai;t for an interrupt y'all!
     lda $2140
     cmp #$EB 
     bne done_with_spc
@@ -155,127 +126,65 @@ Infinity:
     sta $2140
 
 done_with_spc:
+    ;TITLE
+    ;----------------------------------------------------------
+    ; title game code 
+    ; --> display title
+    ;----------------------------------------------------------
 
-    ;update values for background values
-    ;---------------------------------------------
-    ;see if bg_flash is 1 or 0
-    lda bg_flash
-    cmp #$01
-    bne +
+    ;GAME 
+    ;----------------------------------------------------------
 
-    ;see if counter is done
-    lda bg_c
-    cmp #$03
-    bne for
-
-    ;we are done so zero out counter
-    ;and bg flash variable
-    stz bg_c
-    stz bg_flash
-    bra +
-
-for
-    ;(if counter isn't at the max, then inc)
-    inc bg_c
-+
-    ;manage sprite 01 --> x
-    ;---------------------------------------------
-    ;check if sprite hit the right side 
-    lda $0000
-    cmp #(256 - 32)
-    bne +
-
-    lda #$01
-    sta bg_flash
-    stz X_dir
-
-    ;play sound
-    lda #$BE 
-    sta $2140
-
-+
-    ;check if sprite hit the left side
-    lda $0000
-    cmp #$00
-    bne +
-
-    lda #$01
-    sta bg_flash
-    lda #$01
-    sta X_dir
-
-    ;play sound
-    lda #$BE 
-    sta $2140
-+
-    ;---------------------------------------------
-
-    ;manage sprite 01 --> y
-    ;---------------------------------------------
-y_check:
-    ;check if sprite hit the bottom
-    lda $0001
-    cmp #(224 - 32)
-    bne + 
-
-    lda #$01
-    sta bg_flash
-    stz Y_dir
-
-    ;play sound
-    lda #$BE 
-    sta $2140
-
-+
-    ;check if sprite hit the top
-    lda $0001
-    cmp #$00
-    bne +
-
-    lda #$01
-    sta bg_flash
-    sta Y_dir
-
-    ;play sound
-    lda #$BE 
-    sta $2140
-+
+    ; --> drop phase
+    ; ----> start player 1
     
-    ;move sprites according to the direction 
-    ;already determined
-    ;---------------------------------------------
-x_move:
-    lda X_dir
-    cmp #$00
+    ; ----> current player drops
+    
+    ; --------> selection sound as they move locations
+    ; --------> make sure location is legal
+    ; --------> change color/make a bad ding if they try to drop
+    ; --------> nice ding / animation if it works
+    ; --------> update connector graphics
+     
+    ; --------> check win conditions 
+    ; (only do this at the very end)
+
+    ; ----> switch to other player (back up to current player drops)
+
+    ; --> move phase
+
+    ; ----> current player moves
+
+    ; --------> selection sound as they move locations
+    ; --------> player selects one of their things
+    ; --------> player selects legal location to move to
+    ; --------> process move
+
+    ; --------> check win conditions
+
+    ; --------> switch players
+    
+    ; --> game over 
+    ; ----> who won?
+    ; ----> show that player won 
+
+    ; --> reset stuff
+    ; --> go back to title    
+    ;----------------------------------------------------------
+
+    ; test sound
+    lda sound_counter
+    cmp #$80
     bne +
 
-    lda $0000
-    sbc #$01
-    sta $0000
-    jmp y_move
+    stz sound_counter
+    ; play sound
+    lda #$BE 
+    sta $2140
+    
++   inc sound_counter
 
-+
-    lda $0000
-    adc #$01
-    sta $0000
-
-y_move:
-    lda Y_dir 
-    cmp #$00
-    bne +
-
-    lda $0001
-    sbc #$01
-    sta $0001
-    jmp Infinity
-
-+
-    lda $0001
-    adc #$0
-    sta $0001
-    ;---------------------------------------------
-
-    jmp Infinity    ;<-- we outttttt t t t t t t t
+    jmp forever    ;<-- we outttttt t t t t t t t
 ;---------------------------------------------------------------
 
 
@@ -403,8 +312,7 @@ SetupVideo:
 
     plp
     rts
-
-
+;---------------------------------------------------------------
 
 ;NMI (vblank) code
 ;---------------------------------------------------------------
@@ -413,34 +321,7 @@ VBlank:
 	phx
 	phy
     
-    rep #$10    
-    sep #$20
 
-    ;check if bg is flashing
-    lda bg_flash
-    cmp #$01
-    bne +
-
-    ;make BG blue ($72A5)
-    stz $2121
-    lda #$A5
-    sta $2122
-    lda #$72
-    sta $2122
-    jmp pre_setup
-
-+
-    ;otherwise set to white ($7FFF)
-    stz $2121
-    lda #$FF
-    sta $2122
-    lda #$7F
-    sta $2122    
-
-pre_setup:    
-
-    jsr SetupVideo
-    
 	PLY 
 	PLX 
 	PLA 
@@ -449,20 +330,14 @@ pre_setup:
     RTI
 
 ;---------------------------------------------------------------
+; (END of SUBROUTINES)
 .ENDS
 
-;face graphic
+; graphics
 ;---------------------------------------------------------------
 .BANK 1 SLOT 0
 .ORG 0
 .SECTION "graphic_and_audio__includes"
-
-sprite:
-    .incbin "img/face__32x32__.pic"
-
-sprite_palette:
-    .incbin "img/face__32x32__.clr"
-
 
 spc_program:
     .incbin "spc__playWithCollide.bin"

@@ -111,7 +111,7 @@ soundtable
         .byte $3C
         .byte $00           ;Echo volume right
         .byte $4D
-        .byte $00          ;Echo off
+        .byte $00           ;Echo off
 
         .byte $3D
         .byte $00           ;Noise off
