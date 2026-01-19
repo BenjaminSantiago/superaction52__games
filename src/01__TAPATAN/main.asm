@@ -62,7 +62,6 @@ Start:
     ;------------------------------------------------------
     stz gameMODE
     stz BOARD
-    stz sound_counter
     ;------------------------------------------------------
 
     ; LOAD GRAPHICS
@@ -72,9 +71,57 @@ Start:
     ; this actually loads everything (sprites + bg)
     LoadBlockToVRAM bg__tiles, $0000, $5010
     ;------------------------------------------------------
-    
+        
     ; TILE MAP
     ;------------------------------------------------------
+    ; increment after writing to $2119
+    lda #$80
+    sta $2115
+
+    ; tilemap offset --> $3000
+    ; tilemap size   --> 1 screen in either direction
+    lda #$30
+    sta $2107
+
+    ldx #$3000
+    stx $2116
+
+    rep #$10 
+    
+    ldx #$0000
+
+bg_loop:
+    ;load first tile
+    lda.l rando_map, X
+    sta $2118
+
+    lda.l rando_map+1, X
+    sta $2119 
+
+    inx 
+    inx
+
+    cpx #$03A0 
+    bne bg_loop
+    ;------------------------------------------------------
+
+    ; START IT UP!
+    ;------------------------------------------------------
+    ; we want BG 1 & BG 2 to be 16 x 16
+    ; we want BG mode 1
+    lda #%00110001
+    sta $2105
+   
+    ; BG1 character VRAM offset
+    stz $210B
+
+    ; enable BG 1
+    lda #%00000001
+    sta $212C
+
+    ; turn on screen full brightness
+    lda #$0F
+    sta $2100
     ;------------------------------------------------------
 
 
@@ -177,5 +224,8 @@ spc_program:
     .incbin "audio/guitar_palmmuted__C__32k.BRR"
 spcend:
         .db $FF
+
+rando_map:
+    .incbin "random_tilemap.bin"
 ;---------------------------------------------------------------
 .ENDS
