@@ -72,7 +72,7 @@ Start:
     LoadBlockToVRAM bg__tiles, $0000, $5010
     ;------------------------------------------------------
         
-    ; TILE MAP
+    ; TILE MAPS
     ;------------------------------------------------------
     ; increment after writing to $2119
     lda #$80
@@ -92,10 +92,10 @@ Start:
 
 bg_01_loop:
     ;load first tile
-    lda.l tilemap__BG02__move, X
+    lda.l tilemap__BG02__drop, X
     sta $2118
 
-    lda.l tilemap__BG02__move +1, X
+    lda.l tilemap__BG02__drop +1, X
     sta $2119 
 
     inx 
@@ -129,8 +129,40 @@ bg_02_loop:
     bne bg_02_loop
     ;------------------------------------------------------
 
+    ; SPRITES
+    ;------------------------------------------------------
+    jsr SpriteInit
+
+    lda #$50
+    sta $0000
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #$20
+    sta $0001
+    
+    ;first tile
+    lda #$85
+    sta $0002
+    
+    ;set tile priority 
+    ;high bit of tile number (0th)
+    lda #%00110001
+    sta $0003
+
+    ;enable 9th x-bits / Embiggen sprites
+    lda #%00000010
+    sta $0200
+
+    ;16x16 and 32x32 sprites 
+    ;address offset
+    lda #%01000000          
+    sta $2101
+    ;------------------------------------------------------
+
     ; START IT UP!
     ;------------------------------------------------------
+    jsr SetupVideo
+    
     ; we want BG 1 & BG 2 to be 16 x 16
     ; we want BG mode 1
     lda #%00110001
@@ -143,7 +175,8 @@ bg_02_loop:
     stx $2110
 
     ; enable BG 1 & 2
-    lda #%00000011
+    ; enable sprites
+    lda #%00010011
     sta $212C
     
     ; turn on screen full brightness
@@ -224,6 +257,82 @@ VBlank:
     RTI
 
 ;---------------------------------------------------------------
+
+;initialize the sprites to be off-screen
+;(this is only in RAM, still has to be 
+;transferred to the OAM)
+;---------------------------------------------------------------
+SpriteInit:
+	php	
+
+	rep	#$30	;16bit mem/A, 16 bit X/Y
+	
+	ldx #$0000
+    lda #$F001
+_setoffscr:
+    sta $0000,X
+    inx
+    inx
+    inx
+    inx
+    cpx #$0200
+    bne _setoffscr
+;-------------------
+	lda #$5555
+_clr:
+	sta $0000, X		;initialize all sprites to be off the screen
+	inx
+    inx
+	cpx #$0220
+	bne _clr
+;-------------------
+
+	plp
+	rts
+;---------------------------------------------------------------
+
+;set up the "general video"-type registers
+;---------------------------------------------------------------
+SetupVideo:
+    php
+    
+    ;set XY/A
+    rep #$10
+    sep #$20
+    
+    stz $2102
+    stz $2103
+    
+    ;transfer sprite data into OAM
+    ;----------------------------------
+
+    ; DMA params
+    LDA #$00
+    STA $4300      ; DMAP
+
+    LDA #$04
+    STA $4301      ; BBAD = $2104
+
+    LDA #$00
+    STA $4302
+    STA $4303      ; source offset
+
+    LDA #$7E
+    STA $4304      ; source bank
+
+    LDA #$20
+    STA $4305
+    LDA #$02
+    STA $4306      ; $0220 bytes
+
+    LDA #$01
+    STA $420B      ; start DMA
+    ;----------------------------------
+
+    plp
+    rts
+;---------------------------------------------------------------
+
 ; (END of SUBROUTINES)
 .ENDS
 
