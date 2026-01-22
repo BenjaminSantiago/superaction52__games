@@ -45,6 +45,23 @@
 ;   TOP    | MIDDLE     | BOTTOM
 ; 00 00 00 | 00 - 00 00 | 00 00 - 00
 
+; how long to wait for sprite frames
+.EQU    sprite__wait    $0225
+
+; these should be for each coin
+; counter for distance between sprites
+.EQU    sprite__00__P1__counter $0226
+; which sprite we show
+.EQU    sprite__00__P1__sprite  $0227
+
+; location
+.EQU    sprite__00__P1__x       $0228
+.EQU    sprite__00__P1__y       $0229
+
+.EQU sprite__00__P2__counter    $022A
+.EQU sprite__00__P2__sprite     $022B
+.EQU sprite__00__P2__x          $022C
+.EQU sprite__00__P2__y          $022D
 
 
 ; M A I N  C O D E
@@ -62,14 +79,22 @@ Start:
     ;------------------------------------------------------
     stz gameMODE
     stz BOARD
+    stz sprite__00__P1__counter    
+    stz sprite__00__P1__sprite
+
+    stz sprite__00__P2__counter    
+    stz sprite__00__P2__sprite
+
+    lda #$06
+    sta sprite__wait
     ;------------------------------------------------------
 
     ; LOAD GRAPHICS
     ;------------------------------------------------------
-    LoadPalette bg__palette, 0, 16 
-    LoadPalette sprites__palette, 128, 16
-    ; this actually loads everything (sprites + bg)
-    LoadBlockToVRAM bg__tiles, $0000, $5010
+    LoadPalette bg__palette,        0,      16 
+    LoadPalette sprites__palette,   128,    16
+    LoadBlockToVRAM bg__tiles,      $0000,  $1800
+    LoadBlockToVRAM sprites__tiles, $1000,  $2000
     ;------------------------------------------------------
         
     ; TILE MAPS
@@ -133,29 +158,9 @@ bg_02_loop:
     ;------------------------------------------------------
     jsr SpriteInit
 
-    lda #$50
-    sta $0000
-    
-    ;set y (screen.height * .5/height of sprite)
-    lda #$20
-    sta $0001
-    
-    ;first tile
-    lda #$85
-    sta $0002
-    
-    ;set tile priority 
-    ;high bit of tile number (0th)
-    lda #%00110001
-    sta $0003
-
-    ;enable 9th x-bits / Embiggen sprites
-    lda #%00000010
-    sta $0200
-
     ;16x16 and 32x32 sprites 
     ;address offset
-    lda #%01000000          
+    lda #%01100000          
     sta $2101
     ;------------------------------------------------------
 
@@ -179,6 +184,14 @@ bg_02_loop:
     lda #%00010011
     sta $212C
     
+    ; enable interrupts
+    lda #$80
+    sta $4200    
+
+    ;enable 9th x-bits / Embiggen sprites
+    lda #%00001010
+    sta $0200
+
     ; turn on screen full brightness
     lda #$0F
     sta $2100
@@ -195,8 +208,98 @@ forever:
     ; --> display title
     ;----------------------------------------------------------
 
+
     ;GAME 
     ;----------------------------------------------------------
+    
+    ;16x16 and 32x32 sprites 
+    ;address offset
+    lda #%01100000          
+    sta $2101
+
+    ;set x (location 1) 
+    lda #$50
+    sta $0000
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #$20
+    sta $0001
+    
+    ;first tile
+    ldx sprite__00__P1__sprite
+    lda.l sprite__O__indices, X
+    sta $0002
+    
+    lda #%00110001
+    sta $0003
+
+    ;enable 9th x-bits / Embiggen sprites
+    lda #%00001010
+    sta $0200
+
+    ;animate sprite
+    lda sprite__00__P1__sprite
+    cmp #$0D
+    bne + 
+
+    bra done_with_anim
++
+    lda sprite__00__P1__counter
+    cmp sprite__wait
+    bne +
+
+    stz sprite__00__P1__counter
+    inc sprite__00__P1__sprite
+
+
+    bne + 
+
+
++   inc sprite__00__P1__counter
+
+done_with_anim:
+ ;sprite 2
+    ;---------------------------------
+    ;set x (location 1) 
+    lda #$90
+    sta $0004
+    
+    ;set y (screen.height * .5/height of sprite)
+    lda #$20
+    sta $0005
+    
+    ;first tile
+    ldx sprite__00__P2__sprite
+    lda.l sprite__X__indices, X
+    sta $0006
+    
+    ;set tile priority 
+    ;high bit of tile number (0th)
+    lda #%00110001
+    sta $0007
+
+    ;animate sprite
+    lda sprite__00__P2__sprite
+    cmp #$0C
+    bne + 
+
+    bra done_with_anim__2
++
+    lda sprite__00__P1__counter
+    cmp sprite__wait
+    bne +
+
+    stz sprite__00__P2__counter
+    inc sprite__00__P2__sprite
+
+
+    bne + 
+
+
++   inc sprite__00__P2__counter
+
+done_with_anim__2:
+  
 
     ; --> drop phase
     ; ----> start player 1
@@ -246,15 +349,42 @@ forever:
 VBlank:
 	pha
 	phx
-	phy
-    
+	phy    
+    ;-----------------
 
-	PLY 
-	PLX 
-	PLA 
-
+    rep #$10    
     sep #$20
-    RTI
+    
+    ; "shadow OAM" --> actual OAM
+    ;---------------------------------
+    stz $4300
+
+    lda #$04
+    sta $4301
+
+    lda #$00
+    sta $4302
+    sta $4303
+
+    lda #$7E
+    sta $4304
+
+    lda #$20
+    sta $4305
+    lda #$02
+    sta $4306
+
+    lda #$01
+    sta $420B
+    ;---------------------------------
+
+    ;-----------------
+	ply
+    plx
+    pla 
+	
+    sep #$20
+    rti
 
 ;---------------------------------------------------------------
 
@@ -415,5 +545,11 @@ tilemap__BG02__move:
     .dw $4060, $0068, $006A, $0060, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
     .dw $004C, $004E, $004E, $404C, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
     .dw $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
+
+sprite__O__indices:
+    .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C, $C0, $C4
+
+sprite__X__indices:
+    .db $88, $8C, $C0, $C4, $C8, $CC, $00, $04, $08, $0C, $40, $44
 ;---------------------------------------------------------------
 .ENDS
