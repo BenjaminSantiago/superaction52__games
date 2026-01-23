@@ -94,7 +94,7 @@ Start:
     LoadPalette bg__palette,        0,      16 
     LoadPalette sprites__palette,   128,    16
     LoadBlockToVRAM bg__tiles,      $0000,  $1800
-    LoadBlockToVRAM sprites__tiles, $1000,  $2000
+    LoadBlockToVRAM sprites__tiles, $2000,  $3800
     ;------------------------------------------------------
         
     ; TILE MAPS
@@ -103,56 +103,19 @@ Start:
     lda #$80
     sta $2115
 
-    ; tilemap offset --> $3000
+    ; tilemap offset --> $1000
     ; tilemap size   --> 1 screen in either direction
-    lda #$30
+    lda #$10
     sta $2107
-
-    ldx #$3000
-    stx $2116
-
-    rep #$10 
     
-    ldx #$0000
-
-bg_01_loop:
-    ;load first tile
-    lda.l tilemap__BG02__drop, X
-    sta $2118
-
-    lda.l tilemap__BG02__drop +1, X
-    sta $2119 
-
-    inx 
-    inx
-
-    cpx #$03A0 
-    bne bg_01_loop
-    
-    ; tilemap offset --> $3200
+    ; tilemap offset --> $1800
     ; tilemap size   --> 1 screen in either direction
-    lda #$40
+    lda #$18
     sta $2108 
-
-    ldx #$4000
-    stx $2116
     
-    ldx #$0000
-
-bg_02_loop:
-    ;load first tile
-    lda.l tilemap__BG01, X
-    sta $2118
-
-    lda.l tilemap__BG01+1, X
-    sta $2119 
-
-    inx 
-    inx
-
-    cpx #$03A0 
-    bne bg_02_loop
-    ;------------------------------------------------------
+    ; DMA the tile maps
+    LoadBlockToVRAM tilemap__BG02__drop, $1000, 1024 
+    LoadBlockToVRAM tilemap__BG01, $1800, 1024
 
     ; SPRITES
     ;------------------------------------------------------
@@ -160,7 +123,7 @@ bg_02_loop:
 
     ;16x16 and 32x32 sprites 
     ;address offset
-    lda #%01100000          
+    lda #%01100001          
     sta $2101
     ;------------------------------------------------------
 
@@ -212,11 +175,6 @@ forever:
     ;GAME 
     ;----------------------------------------------------------
     
-    ;16x16 and 32x32 sprites 
-    ;address offset
-    lda #%01100000          
-    sta $2101
-
     ;set x (location 1) 
     lda #$50
     sta $0000
@@ -230,7 +188,7 @@ forever:
     lda.l sprite__O__indices, X
     sta $0002
     
-    lda #%00110001
+    lda #%00110000
     sta $0003
 
     ;enable 9th x-bits / Embiggen sprites
@@ -280,7 +238,7 @@ done_with_anim:
 
     ;animate sprite
     lda sprite__00__P2__sprite
-    cmp #$0C
+    cmp #$0B
     bne + 
 
     bra done_with_anim__2
@@ -480,9 +438,9 @@ bg__tiles:
 
 ; tiles for "coin" sprites, and cursor
 sprites__palette: 
-    .incbin "_graphics/TAPATAN__sprites.clr"
+    .incbin "_graphics/TAPATAN__sprites__v02.clr"
 sprites__tiles: 
-    .incbin "_graphics/TAPATAN__sprites.pic"
+    .incbin "_graphics/TAPATAN__sprites__v02.pic"
 
 ; sound stuff
 spc_program:
@@ -550,6 +508,6 @@ sprite__O__indices:
     .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C, $C0, $C4
 
 sprite__X__indices:
-    .db $88, $8C, $C0, $C4, $C8, $CC, $00, $04, $08, $0C, $40, $44
+    .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C
 ;---------------------------------------------------------------
 .ENDS

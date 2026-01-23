@@ -1,8 +1,3 @@
-;sprite screen collision with sound at edge of screen
-;by Benjamin Santiago
-;(based on bazz example)
-;---------------------------------------------------------------
-
 ;includes
 ;---------------------------------------------------------------
 ;header for this ROM
@@ -14,6 +9,12 @@
 .INCLUDE "inc/load_graphics.asm"
 
 ;variables
+;---------------------------------------------------------------
+.EQU MIKE__x    $0221
+.EQU MIKE__y    $0222
+.EQU MIKE__spr  $0223
+
+.EQU fallSPEED $0224
 ;---------------------------------------------------------------
 
 ;where the processor goes on reset
@@ -27,6 +28,15 @@ Start:
     InitSNES   
 
     ;"initialize" the "variables"
+    lda #$80
+    sta MIKE__x
+    sta MIKE__y
+
+    lda #$00
+    sta MIKE__spr
+
+    lda #$02
+    sta fallSPEED
 
     jsr InitSoundCPU
 
@@ -34,25 +44,39 @@ Start:
     rep #$10    
     sep #$20
 
-    lda #%00001001
+    ; BG Mode
+    ; BG mode 01
+    ; BG Layer 1 character size 16x16
+    lda #%00010001
     sta $2105
 
-    ;initial bg color (white $7FFF)
-    stz $2121
-    lda #$FF
-    sta $2122
-    lda #$7F
-    sta $2122
-    
     ; Load Palette for our tiles
-    LoadPalette sprite_palette, 128, 16     ; Sprite Palettes start at color 128
+    LoadPalette bg__palette, 0, 16
+    ; Sprite Palettes start at color 128!
+    LoadPalette sprite__palette, 128, 16     
 
     ; Load Tile data to VRAM
-    LoadBlockToVRAM sprite, $0000, $0800
+    LoadBlockToVRAM bg__tiles, $0000, $0400
+    LoadBlockToVRAM sprite__tiles, $1000, $0400
 
     ;put RAM "copy" of sprites offscreen
     jsr SpriteInit    
     
+    lda MIKE__x
+    sta $0000
+
+    lda MIKE__y
+    sta $0001
+
+    lda MIKE__spr
+    sta $0002
+
+    lda #%00110001
+    sta $0003
+    
+    lda #%00000010
+    sta $0200
+
     ; Setup Video modes and other stuff, then turn on the screen
     jsr SetupVideo
 
@@ -64,6 +88,22 @@ Start:
 ;---------------------------------------------------------------
 FOREVER:
     wai;t for interrupt
+
+    lda MIKE__y 
+    cmp #$F0
+    bcc +
+
+    lda #$02
+    sta fallSPEED
+
++
+    ; "gravity"
+    inc fallSPEED
+    lda MIKE__y
+    clc 
+    adc fallSPEED
+    sta MIKE__y
+    sta $0001
 
     
     jmp FOREVER    ;<-- we outttttt t t t t t t t
@@ -183,11 +223,13 @@ SetupVideo:
 	LDA #$01
 	STA $420B		;start DMA transfer
 	
-	lda #%10100000
+	lda #%00000000
     sta $2101
 
-    lda #%00010000      ;Enable BG1
+    ; enable bg and sprites
+    lda #%00010000      
     sta $212C
+    
     
     lda #$0F
     sta $2100           ;Turn on screen, full Brightness
@@ -206,27 +248,6 @@ VBlank:
     
     rep #$10    
     sep #$20
-
-    ;check if bg is flashing
-    lda bg_flash
-    cmp #$01
-    bne +
-
-    ;make BG blue ($72A5)
-    stz $2121
-    lda #$A5
-    sta $2122
-    lda #$72
-    sta $2122
-    jmp pre_setup
-
-+
-    ;otherwise set to white ($7FFF)
-    stz $2121
-    lda #$FF
-    sta $2122
-    lda #$7F
-    sta $2122    
 
 pre_setup:    
 
@@ -247,6 +268,15 @@ pre_setup:
 .BANK 1 SLOT 0
 .ORG 0
 .SECTION "graphic_and_audio__includes"
+
+bg__palette: 
+    .incbin "_graphics/MICROmike__bg__proto.clr"
+sprite__palette:
+    .incbin "_graphics/MICROmike__v01.clr"
+bg__tiles:
+    .incbin "_graphics/MICROmike__bg__proto.pic"
+sprite__tiles:
+    .incbin "_graphics/MICROmike__v01.pic"
 
 
 ;---------------------------------------------------------------
