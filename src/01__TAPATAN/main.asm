@@ -431,6 +431,9 @@ forever:
     
  done_with_P1CONTROL:
     ; --> drop phase
+    ; ----> select the write pills
+    
+    ; ----> scroll pills 
     ; ----> start player 1
     
     ; ----> current player drops

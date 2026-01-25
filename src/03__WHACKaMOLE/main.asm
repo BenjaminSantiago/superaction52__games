@@ -16,9 +16,9 @@
 
 ;where the processor goes on reset
 ;---------------------------------------------------------------
-.BANK 0 SLOT 0
-.ORG 0
-.SECTION "MainCode"
+.BANK       0 SLOT 0
+.ORG        0
+.SECTION    "MainCode"
 
 Start:
     ;start up the SNES
@@ -97,49 +97,6 @@ _clr:
 	rts
 ;---------------------------------------------------------------
 
-InitSoundCPU:
-    php
-    pha
-    phx
-
-    rep #$30
-    sep #$20
-
-    ;initialize transfer
-    ;------------------------------------------------------
-    ;make sure #$AA and #$BB are at $2140 and $2141 
-    ;respectively. this is makes sure that the SPC is ready
-    ;the original code didn't do this but worked fine
-    lda #$AA
--
-    cmp $2140
-    bne -
--
-    lda #$BB
-    cmp $2141
-    bne -   
-    
-    ldx #$0400      ;Target SPC address for program, why #$400?
-                    ;(because that's where SPCTEST.asm "orgs" to)
-    stx $2142       ;why port 2 --> port 2 is address for data
-
-    lda #$01        ;what is 1  --> value to initialize transfer
-    sta $2141       ;why port 1 --> port 1 is status of transfer
-
-    ;wait for SPC sync
-    ;when you read CC on 2140 from SPC
-    ;everything is good
-    lda #$CC
-    sta $2140
--       cmp $2140       
-    bne -
-
-    plx
-    pla
-    plp
-    rts
-    ;------------------------------------------------------
-
 
 ;set up the "general video"-type registers
 ;---------------------------------------------------------------
@@ -185,6 +142,7 @@ SetupVideo:
 
     plp
     rts
+;---------------------------------------------------------------
 
 
 
@@ -198,46 +156,27 @@ VBlank:
     rep #$10    
     sep #$20
 
-    ;check if bg is flashing
-    lda bg_flash
-    cmp #$01
-    bne +
+    ;-----------------------------------------
 
-    ;make BG blue ($72A5)
-    stz $2121
-    lda #$A5
-    sta $2122
-    lda #$72
-    sta $2122
-    jmp pre_setup
 
-+
-    ;otherwise set to white ($7FFF)
-    stz $2121
-    lda #$FF
-    sta $2122
-    lda #$7F
-    sta $2122    
-
-pre_setup:    
-
-    jsr SetupVideo
+    ;-----------------------------------------
     
-	PLY 
-	PLX 
-	PLA 
-
     sep #$20
-    RTI
+	
+    ply 
+	plx 
+	pla 
+
+    rti
 
 ;---------------------------------------------------------------
 .ENDS
 
 ;face graphic
 ;---------------------------------------------------------------
-.BANK 1 SLOT 0
-.ORG 0
-.SECTION "graphic_and_audio__includes"
+.BANK       1 SLOT 0
+.ORG        0
+.SECTION    "graphic_and_audio__includes"
 
 
 ;---------------------------------------------------------------
