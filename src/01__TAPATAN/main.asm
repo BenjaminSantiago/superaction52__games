@@ -63,6 +63,22 @@
 .EQU sprite__00__P2__x          $022C
 .EQU sprite__00__P2__y          $022D
 
+;variables for controller
+.EQU joy1H__c   $022E
+.EQU joy1H__p   $022F
+.EQU joy1H__h   $0230
+
+.EQU joy1L__c   $0231
+.EQU joy1L__p   $0232
+.EQU joy1L__h   $0233
+
+.EQU HDMA_table  $0234
+
+.EQU PILL__player__offset  $023B
+.EQU PILL__player__direction $023D
+
+.EQU CURSOR__P1__x  $023E
+.EQU CURSOR__P1__y  $023F
 
 ; M A I N  C O D E
 ; where the processor goes on reset
@@ -85,8 +101,17 @@ Start:
     stz sprite__00__P2__counter    
     stz sprite__00__P2__sprite
 
+    stz PILL__player__offset
+    stz PILL__player__direction
+
     lda #$06
     sta sprite__wait
+
+    lda #$50
+    sta CURSOR__P1__x
+    
+    lda #$20
+    sta CURSOR__P1__y
     ;------------------------------------------------------
 
     ; LOAD GRAPHICS
@@ -148,12 +173,15 @@ Start:
     sta $212C
     
     ; enable interrupts
-    lda #$80
+    lda #$81
     sta $4200    
 
     ;enable 9th x-bits / Embiggen sprites
     lda #%00001010
     sta $0200
+
+    jsr MAKE__HDMAtable
+    jsr InitHDMA
 
     ; turn on screen full brightness
     lda #$0F
@@ -177,22 +205,22 @@ forever:
     
     ;set x (location 1) 
     lda #$50
-    sta $0000
+    sta $0004
     
     ;set y (screen.height * .5/height of sprite)
     lda #$20
-    sta $0001
+    sta $0005
     
     ;first tile
     ldx sprite__00__P1__sprite
     lda.l sprite__O__indices, X
-    sta $0002
+    sta $0006
     
-    lda #%00110000
-    sta $0003
+    lda #%00100000
+    sta $0007
 
     ;enable 9th x-bits / Embiggen sprites
-    lda #%00001010
+    lda #%00101010
     sta $0200
 
     ;animate sprite
@@ -215,26 +243,26 @@ forever:
 
 +   inc sprite__00__P1__counter
 
-done_with_anim:
+ done_with_anim:
  ;sprite 2
     ;---------------------------------
     ;set x (location 1) 
     lda #$90
-    sta $0004
+    sta $0008
     
     ;set y (screen.height * .5/height of sprite)
     lda #$20
-    sta $0005
+    sta $0009
     
     ;first tile
     ldx sprite__00__P2__sprite
     lda.l sprite__X__indices, X
-    sta $0006
+    sta $000A
     
     ;set tile priority 
     ;high bit of tile number (0th)
-    lda #%00110001
-    sta $0007
+    lda #%00100001
+    sta $000B
 
     ;animate sprite
     lda sprite__00__P2__sprite
@@ -256,9 +284,152 @@ done_with_anim:
 
 +   inc sprite__00__P2__counter
 
-done_with_anim__2:
-  
+ done_with_anim__2:
+    ; check direction 
+    ; 0 is left, 1 is right
+    lda PILL__player__direction
+    cmp #$00
+    bne move_right
 
+    ; if 0 
+    ; check if we are at the max #$30    
+    rep #$20
+    lda PILL__player__offset
+    cmp #$0040 
+    bcc +
+    sep #$20
+
+    ; if we are, change direction
+    lda #$01 
+    sta PILL__player__direction
+    bra done_with_PILL
+
++   
+    ; move to the left (adc)
+    rep #$20
+    lda PILL__player__offset
+    clc 
+    adc #$0002
+    sta PILL__player__offset
+    sta HDMA_table+1
+    sep #$20
+    bra done_with_PILL
+
+ move_right:
+    ; check if we are at #$00
+    rep #$20
+    lda PILL__player__offset
+    cmp #$0002 
+    bcs +
+    sep #$20
+    
+    ; if 1
+    ; if we are, change direction
+    lda #$00
+    sta PILL__player__direction
+    bra done_with_PILL
+
+    ; move to the right (sbc)
++   rep #$20
+    lda PILL__player__offset
+    sec 
+    sbc #$0002
+    sta PILL__player__offset
+    sta HDMA_table+1
+    sep #$20
+    
+ done_with_PILL:
+    ;---------------------------------
+    ;set x (location 1)
+    lda CURSOR__P1__x
+    
+    sta $0000
+    
+    ;$50, $90, $D0
+    ;$20, $60, $A0
+    ;set y (screen.height * .5/height of sprite)
+    lda CURSOR__P1__y
+    ; something might be up with the sprite?
+    dec a
+    sta $0001
+    
+    ;first tile
+    lda #$C8
+    sta $0002
+    
+    ;set tile priority 
+    ;high bit of tile number (0th)
+    lda #%00110000
+    sta $0003
+    ;---------------------------------
+
+ check_controls:
+    
+ check__P1__UP:
+    lda joy1H__p
+    and #%00001000
+    beq check__P1__DOWN
+
+    ;---------------------------
+    lda CURSOR__P1__y
+    cmp #$20
+    beq check__P1__DOWN
+
+    lda CURSOR__P1__y
+    sec
+    sbc #$40
+    sta CURSOR__P1__y
+    ;---------------------------
+
+ check__P1__DOWN:
+    lda joy1H__p
+    and #%00000100
+    beq check__P1__LEFT
+
+    ;---------------------------
+    lda CURSOR__P1__y
+    cmp #$A0
+    beq check__P1__LEFT
+
+    lda CURSOR__P1__y
+    clc
+    adc #$40
+    sta CURSOR__P1__y
+    ;---------------------------
+
+ check__P1__LEFT:
+    lda joy1H__p
+    and #%00000010
+    beq check__P1__RIGHT
+
+    ;---------------------------
+    lda CURSOR__P1__x
+    cmp #$50
+    beq check__P1__RIGHT
+
+    lda CURSOR__P1__x
+    sec
+    sbc #$40
+    sta CURSOR__P1__x
+    ;---------------------------
+
+ check__P1__RIGHT:
+    lda joy1H__p
+    and #%00000001
+    beq done_with_P1CONTROL
+    
+    ;---------------------------
+    lda CURSOR__P1__x
+    cmp #$D0
+    beq done_with_P1CONTROL
+
+    lda CURSOR__P1__x
+    clc
+    adc #$40
+    sta CURSOR__P1__x
+    ;---------------------------
+    
+ done_with_P1CONTROL:
     ; --> drop phase
     ; ----> start player 1
     
@@ -336,6 +507,63 @@ VBlank:
     sta $420B
     ;---------------------------------
 
+    ; CONTROLLER
+    ;-------------------------------------
+    ; get joypad status
+    ; wait until it is ready
+-
+    lda $4212
+    and #$01
+    bne -
+    
+    ;read controller 1 high
+    ;store current in Y (for p)
+    ldy joy1H__c
+
+    ;get current
+    lda $4219
+    sta joy1H__c
+
+    ;switch
+    tya 
+    
+    ;figure out new presses (p)
+    ;figure out what was held (h)
+    eor joy1H__c
+    and joy1H__c
+    sta joy1H__p
+    tya 
+    and joy1H__c
+    sta joy1H__h
+
+    ;read controller 1 high
+    ;store current in Y (for p)
+    ldy joy1L__c
+
+    ;get current
+    lda $4218
+    sta joy1L__c
+
+    ;switch
+    tya 
+    
+    ;figure out new presses (p)
+    ;figure out what was held (h)
+    eor joy1L__c
+    and joy1L__c
+    sta joy1L__p
+    tya 
+    and joy1L__c
+    sta joy1L__h
+
+    ;HDMA stuff
+    stz $210D
+    stz $210D
+
+    lda #$02
+    sta $420C
+
+    lda $4210
     ;-----------------
 	ply
     plx
@@ -421,6 +649,45 @@ SetupVideo:
     rts
 ;---------------------------------------------------------------
 
+;---------------------------------------------------------------
+InitHDMA:
+    lda #$02 ; mode 2 = 2 bytes per scanline
+    sta $4310 ; DMAP1
+
+
+    lda #$0D ; $210D = BG1 HOFS
+    sta $4311 ; BBAD1
+
+
+    lda #<HDMA_table
+    sta $4312 ; table low
+    lda #>HDMA_table
+    sta $4313 ; table high
+
+
+    lda #:HDMA_table
+    sta $4314 ; table bank
+
+    rts
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+MAKE__HDMAtable:
+    lda #32
+    sta HDMA_table
+
+    stz HDMA_table + 1
+    stz HDMA_table + 2
+
+    lda #192
+    sta HDMA_table + 3
+
+    stz HDMA_table + 4
+    stz HDMA_table + 5
+
+    stz HDMA_table + 6
+    rts
+;---------------------------------------------------------------
 ; (END of SUBROUTINES)
 .ENDS
 
@@ -509,5 +776,7 @@ sprite__O__indices:
 
 sprite__X__indices:
     .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C
+
 ;---------------------------------------------------------------
 .ENDS
+cd

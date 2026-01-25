@@ -14,7 +14,20 @@
 .EQU MIKE__y    $0222
 .EQU MIKE__spr  $0223
 
-.EQU fallSPEED $0224
+.EQU fallSPEED          $0224
+.EQU fallACCEL          $0225
+.EQU fallACCEL__wait    $0226
+.EQU fallACCEL__wait__c $0227
+
+;variables for controller
+.EQU joy1H__c   $0228
+.EQU joy1H__p   $0229
+.EQU joy1H__h   $022A
+
+.EQU joy1L__c   $022B
+.EQU joy1L__p   $022C
+.EQU joy1L__h   $022D
+
 ;---------------------------------------------------------------
 
 ;where the processor goes on reset
@@ -28,8 +41,10 @@ Start:
     InitSNES   
 
     ;"initialize" the "variables"
-    lda #$80
+    lda #$60
     sta MIKE__x
+
+    lda #$40
     sta MIKE__y
 
     lda #$00
@@ -38,7 +53,17 @@ Start:
     lda #$02
     sta fallSPEED
 
+    lda #$01
+    sta fallACCEL
+    
+    lda #$06
+    sta fallACCEL__wait 
+
+    stz fallACCEL__wait__c
+    
+    ;-------------------------------
     jsr InitSoundCPU
+    ;-------------------------------
 
     ;A/X/Y width (XY 16-bit & A 8-bit)   
     rep #$10    
@@ -81,7 +106,8 @@ Start:
     jsr SetupVideo
 
     ; Enable NMI
-    lda #$80
+    ; Enable Joypad
+    lda #$81
     sta $4200       
 
 ;main loop
@@ -89,24 +115,74 @@ Start:
 FOREVER:
     wai;t for interrupt
 
+    ; read controller 
+    ; ---------------------------------------
+    lda joy1L__p
+    and #%10000000
+    beq _apply_gravity
+
+    lda #$FC
+    sta fallSPEED
+    ; ---------------------------------------
+
+_apply_gravity:
+    ; ---------------------------------------
+    lda fallACCEL__wait__c
+    cmp fallACCEL__wait
+    bne + 
+
+    ; when the counter is done
+    ; reset counter
+    stz fallACCEL__wait__c
+
+    ; "gravity" applied
+    ; add acceleration to fall speed
+    lda fallACCEL
+    clc
+    adc fallSPEED
+    sta fallSPEED
+
++
+    inc fallACCEL__wait__c
+    
+    ; add speed to Mike's Y
+    lda MIKE__y
+    clc 
+    adc fallSPEED
+    sta MIKE__y
+
+    ;check if he hit the ceiling
+    lda fallSPEED
+    bpl +
+
+    lda MIKE__y
+    cmp #$E0
+    bcc +
+
+    ; hit ceiling
+    ; clamp y
+    lda #$00
+    sta MIKE__y
+
+    ; stop speed
+    stz fallSPEED
++
+    ; ---------------------------------------
+    ; respawn if he falls through the floor.
     lda MIKE__y 
-    cmp #$F0
+    cmp #$E0
     bcc +
 
     lda #$02
     sta fallSPEED
 
-+
-    ; "gravity"
-    inc fallSPEED
-    lda MIKE__y
-    clc 
-    adc fallSPEED
+    lda #$40
     sta MIKE__y
++
+    ; put into OAM
+    lda MIKE__y
     sta $0001
-
-    
-    jmp FOREVER    ;<-- we outttttt t t t t t t t
+   jmp FOREVER    ;<-- we outttttt t t t t t t t
 ;---------------------------------------------------------------
 
 
@@ -253,12 +329,64 @@ pre_setup:
 
     jsr SetupVideo
     
-	PLY 
-	PLX 
-	PLA 
+    ; CONTROLLER
+    ;-------------------------------------
+    ; get joypad status
+    ; wait until it is ready
+-
+    lda $4212
+    and #$01
+    bne -
+    
+    ;read controller 1 high
+    ;store current in Y (for p)
+    ldy joy1H__c
+
+    ;get current
+    lda $4219
+    sta joy1H__c
+
+    ;switch
+    tya 
+    
+    ;figure out new presses (p)
+    ;figure out what was held (h)
+    eor joy1H__c
+    and joy1H__c
+    sta joy1H__p
+    tya 
+    and joy1H__c
+    sta joy1H__h
+
+    ;read controller 1 high
+    ;store current in Y (for p)
+    ldy joy1L__c
+
+    ;get current
+    lda $4218
+    sta joy1L__c
+
+    ;switch
+    tya 
+    
+    ;figure out new presses (p)
+    ;figure out what was held (h)
+    eor joy1L__c
+    and joy1L__c
+    sta joy1L__p
+    tya 
+    and joy1L__c
+    sta joy1L__h
+
+    ;read and clear nmi latch
+    lda $4210
+
+	ply 
+	plx 
+	pla 
 
     sep #$20
-    RTI
+    rti
 
 ;---------------------------------------------------------------
 .ENDS
