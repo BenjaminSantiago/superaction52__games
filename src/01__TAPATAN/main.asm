@@ -25,7 +25,7 @@
 ; 03 --> game -> move phase
 ; 04 --> game -> game over
 
-.EQU    BOARD       $0222 ; -> 0224
+.EQU    BOARD_00    $0222 ; -> 0224
 .EQU    BOARD_01    $0223
 .EQU    BOARD_02    $0224
 
@@ -37,13 +37,10 @@
 ; p1 occupied   -> 01
 ; p2 occupied   -> 10
 
-; memory locations
-; $0222         - $0223         - $0224
-; 00 00 00 | 00 - 00 00 | 00 00 - 00
-
-; GAME BOARD ROWS
-;   TOP    | MIDDLE     | BOTTOM
-; 00 00 00 | 00 - 00 00 | 00 00 - 00
+; memory locations    
+; 00 | 00 00 00 <-- $0222 TOP ROW
+; 00 | 00 00 00 <-- $0223 MIDDLE ROW
+; 00 | 00 00 00 <-- $0224 BOTTOM ROW
 
 ; how long to wait for sprite frames
 .EQU    sprite__wait    $0225
@@ -80,6 +77,10 @@
 .EQU CURSOR__P1__x  $023E
 .EQU CURSOR__P1__y  $023F
 
+;0 --> 1
+;1 --> 2
+.EQU current__PLAYER $0240
+
 ; M A I N  C O D E
 ; where the processor goes on reset
 ;---------------------------------------------------------------
@@ -94,7 +95,12 @@ Start:
     ;"initialize" the "variables"
     ;------------------------------------------------------
     stz gameMODE
-    stz BOARD
+    stz BOARD_00
+    stz BOARD_01
+    stz BOARD_02
+
+    stz sprite__00__P1__x
+    stz sprite__00__P1__y
     stz sprite__00__P1__counter    
     stz sprite__00__P1__sprite
 
@@ -107,11 +113,13 @@ Start:
     lda #$06
     sta sprite__wait
 
-    lda #$50
+    lda #$90
     sta CURSOR__P1__x
     
-    lda #$20
+    lda #$60
     sta CURSOR__P1__y
+    
+    stz current__PLAYER
     ;------------------------------------------------------
 
     ; LOAD GRAPHICS
@@ -180,8 +188,8 @@ Start:
     lda #%00001010
     sta $0200
 
-    jsr MAKE__HDMAtable
-    jsr InitHDMA
+    ;jsr MAKE__HDMAtable
+    ;jsr InitHDMA
 
     ; turn on screen full brightness
     lda #$0F
@@ -193,6 +201,10 @@ Start:
 ;---------------------------------------------------------------
 forever:
     wai;t for an interrupt y'all!
+
+    rep #$10
+    sep #$20 
+
     ;TITLE
     ;----------------------------------------------------------
     ; title game code 
@@ -202,19 +214,20 @@ forever:
 
     ;GAME 
     ;----------------------------------------------------------
-    
-    ;set x (location 1) 
-    lda #$50
+    ;set x 
+    lda sprite__00__P1__x
     sta $0004
     
-    ;set y (screen.height * .5/height of sprite)
-    lda #$20
+    ;set y 
+    lda sprite__00__P1__y
     sta $0005
     
     ;first tile
+    sep #$10
     ldx sprite__00__P1__sprite
     lda.l sprite__O__indices, X
     sta $0006
+    rep #$10
     
     lda #%00100000
     sta $0007
@@ -227,7 +240,7 @@ forever:
     lda sprite__00__P1__sprite
     cmp #$0D
     bne + 
-
+    
     bra done_with_anim
 +
     lda sprite__00__P1__counter
@@ -237,119 +250,122 @@ forever:
     stz sprite__00__P1__counter
     inc sprite__00__P1__sprite
 
-
-    bne + 
-
-
 +   inc sprite__00__P1__counter
 
  done_with_anim:
  ;sprite 2
     ;---------------------------------
     ;set x (location 1) 
-    lda #$90
-    sta $0008
+    ;lda #$90
+    ;sta $0008
     
     ;set y (screen.height * .5/height of sprite)
-    lda #$20
-    sta $0009
+    ;lda #$20
+    ;sta $0009
     
     ;first tile
-    ldx sprite__00__P2__sprite
-    lda.l sprite__X__indices, X
-    sta $000A
+    ;ldx sprite__00__P2__sprite
+    ;lda.l sprite__X__indices, X
+    ;sta $000A
     
     ;set tile priority 
     ;high bit of tile number (0th)
-    lda #%00100001
-    sta $000B
+    ;lda #%00100001
+    ;sta $000B
 
     ;animate sprite
-    lda sprite__00__P2__sprite
-    cmp #$0B
-    bne + 
+    ;lda sprite__00__P2__sprite
+    ;cmp #$0B
+    ;bne + 
 
-    bra done_with_anim__2
-+
-    lda sprite__00__P1__counter
-    cmp sprite__wait
-    bne +
+    ;bra done_with_anim__2
+;+
+    ;lda sprite__00__P1__counter
+    ;cmp sprite__wait
+    ;bne +
 
-    stz sprite__00__P2__counter
-    inc sprite__00__P2__sprite
+    ;stz sprite__00__P2__counter
+    ;inc sprite__00__P2__sprite
+
+    ;bne + 
 
 
-    bne + 
+;+   inc sprite__00__P2__counter
 
+; This animates the pill with the player # 
+; displayed on it
 
-+   inc sprite__00__P2__counter
-
- done_with_anim__2:
+; done_with_anim__2:
     ; check direction 
     ; 0 is left, 1 is right
-    lda PILL__player__direction
-    cmp #$00
-    bne move_right
+    ;lda PILL__player__direction
+    ;cmp #$00
+    ;bne move_right
 
     ; if 0 
     ; check if we are at the max #$30    
-    rep #$20
-    lda PILL__player__offset
-    cmp #$0040 
-    bcc +
-    sep #$20
+    ;rep #$20
+    ;lda PILL__player__offset
+    ;cmp #$0040 
+    ;bcc +
+    ;sep #$20
 
     ; if we are, change direction
-    lda #$01 
-    sta PILL__player__direction
-    bra done_with_PILL
+    ;lda #$01 
+    ;sta PILL__player__direction
+    ;bra done_with_PILL
 
-+   
+;+   
     ; move to the left (adc)
-    rep #$20
-    lda PILL__player__offset
-    clc 
-    adc #$0002
-    sta PILL__player__offset
-    sta HDMA_table+1
-    sep #$20
-    bra done_with_PILL
+    ;rep #$20
+    ;lda PILL__player__offset
+    ;clc 
+    ;adc #$0002
+    ;sta PILL__player__offset
+    ;sta HDMA_table+1
+    ;sep #$20
+    ;bra done_with_PILL
 
- move_right:
+ ;move_right:
     ; check if we are at #$00
-    rep #$20
-    lda PILL__player__offset
-    cmp #$0002 
-    bcs +
-    sep #$20
+    ;rep #$20
+    ;lda PILL__player__offset
+    ;cmp #$0002 
+    ;bcs +
+    ;sep #$20
     
     ; if 1
     ; if we are, change direction
-    lda #$00
-    sta PILL__player__direction
-    bra done_with_PILL
+    ;lda #$00
+    ;sta PILL__player__direction
+    ;bra done_with_PILL
 
     ; move to the right (sbc)
-+   rep #$20
-    lda PILL__player__offset
-    sec 
-    sbc #$0002
-    sta PILL__player__offset
-    sta HDMA_table+1
-    sep #$20
+;+   rep #$20
+    ;lda PILL__player__offset
+    ;sec 
+    ;sbc #$0002
+    ;sta PILL__player__offset
+    ;sta HDMA_table+1
+    ;sep #$20
     
  done_with_PILL:
+    
+    ; SEE WHO IS THE CURRENT PLAYER
+    ;---------------------------------
+    ;lda current__PLAYER
+    ;bpl player__02__CURSOR
+
+    ; DISPLAY PLAYER 01 CURSOR
     ;---------------------------------
     ;set x (location 1)
     lda CURSOR__P1__x
-    
-    sta $0000
-    
-    ;$50, $90, $D0
-    ;$20, $60, $A0
+    sta $0000   
+
     ;set y (screen.height * .5/height of sprite)
     lda CURSOR__P1__y
     ; something might be up with the sprite?
+    ; (i.e. how it is stored in RAM?)
     dec a
     sta $0001
     
@@ -416,12 +432,12 @@ forever:
  check__P1__RIGHT:
     lda joy1H__p
     and #%00000001
-    beq done_with_P1CONTROL
+    beq check__P1__A
     
     ;---------------------------
     lda CURSOR__P1__x
     cmp #$D0
-    beq done_with_P1CONTROL
+    beq check__P1__A
 
     lda CURSOR__P1__x
     clc
@@ -429,6 +445,138 @@ forever:
     sta CURSOR__P1__x
     ;---------------------------
     
+ check__P1__A:
+    lda joy1L__p
+    and #%10000000
+    beq done_with_P1CONTROL
+
+    ;x values
+    ;$50, $90, $D0
+    
+    ;y values
+    ;$20, $60, $A0
+
+    ; memory locations    
+    ; 00 | 00 00 00 <-- $0222 TOP ROW
+    ; 00 | 00 00 00 <-- $0223 MIDDLE ROW
+    ; 00 | 00 00 00 <-- $0224 BOTTOM ROW
+  
+    ; A PRESSED
+    ;---------------------------
+    ; set the sprite to start animating
+    ;stz sprite__00__P1__counter    
+    ;stz sprite__00__P1__sprite
+        ; use x and y for...x and y
+    ; sure there are better ways
+    ; to do this, but there are 9
+    ; locations so I need at least
+    ; 9 bits so idk, just using
+    ; the x and y
+
+    ; for x --> 
+    ; 00000011 --> LEFT
+    ; 00001100 --> MIDDLE
+    ; 00110000 --> RIGHT
+
+    ; for y --> 
+    ; 00 --> TOP
+    ; 01 --> MIDDLE
+    ; 02 --> BOTTOM
+    ldx #$00
+    ldy #$00
+
+    ; get the cursor x
+    lda CURSOR__P1__x
+
+    ;left 
+    cmp #$50
+    bne +
+
+    ldx #%00110000
+
++   ;middle
+    lda CURSOR__P1__x
+    cmp #$90
+    bne +
+
+    ldx #%00001100
+
++   ;assume right
+    ldx #%00000011
+
+    ; get the cursor y
+ A__check__P1__y:
+    ; top
+    lda CURSOR__P1__y
+    cmp #$20
+    bne +
+
+    ldy #$00
+
++   ; middle 
+    lda CURSOR__P1__y
+    cmp #$60
+    bne +
+
+    ldy #$01
+
++   ; bottom 
+    ldy #$02
+
+    ; use x & y to determine where in the
+    ; "board bits" it will go
+    ; make sure it is not already taken 
+
+    txa 
+    and BOARD_00, Y
+
+    ; if it is not ZERO we will get out
+    ; cell is occupied
+    ; PUT SOMETHING TO SHOW "BAD" FEEDBACK
+    bne done_with_P1CONTROL 
+    
+    ; in drop phase, 
+    ; set the board bit as occupied    
+    txa 
+    cmp #%00110000
+    bne +
+
+    lda #%00010000
+    bra @set_board_bits
+
++   txa
+    cmp #%00001100
+    bne + 
+
+    lda #%00000100
+    bra @set_board_bits
+
++   lda #%00000001
+
+ @set_board_bits:
+    sta BOARD_00, Y
+    lda CURSOR__P1__x
+    sta sprite__00__P1__x
+
+    lda CURSOR__P1__y
+    sta sprite__00__P1__y
+
+    stz sprite__00__P1__counter
+    stz sprite__00__P1__sprite
+
+    ; get which "coin" this is (1, 2, 3) 
+    ; (ie do we need to switch phase)   
+
+    ; in move phase, 
+
+    ; select piece that is going to be moved
+
+    ; in move phase, 
+
+    ; select new location for piece
+    ;---------------------------
+
+
  done_with_P1CONTROL:
     ; --> drop phase
     ; ----> select the write pills
@@ -469,7 +617,7 @@ forever:
     ; --> reset stuff
     ; --> go back to title    
     ;----------------------------------------------------------
-
+    
     jmp forever    ;<-- we outttttt t t t t t t t
 ;---------------------------------------------------------------
 
@@ -479,6 +627,7 @@ forever:
 ;NMI (vblank) code
 ;---------------------------------------------------------------
 VBlank:
+    php
 	pha
 	phx
 	phy    
@@ -571,6 +720,7 @@ VBlank:
 	ply
     plx
     pla 
+    plp
 	
     sep #$20
     rti
