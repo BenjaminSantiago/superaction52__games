@@ -69,17 +69,30 @@
 .EQU joy1L__p   $0232
 .EQU joy1L__h   $0233
 
-.EQU HDMA_table  $0234
+.EQU joy2H__c   $0234
+.EQU joy2H__p   $0235
+.EQU joy2H__h   $0236
 
-.EQU PILL__player__offset  $023B
-.EQU PILL__player__direction $023D
+.EQU joy2L__c   $0237
+.EQU joy2L__p   $0238
+.EQU joy2L__h   $0239
 
-.EQU CURSOR__P1__x  $023E
-.EQU CURSOR__P1__y  $023F
+.EQU PILL__player__offset  $023A
+.EQU PILL__player__direction $023B
+
+.EQU CURSOR__P1__x  $023C
+.EQU CURSOR__P1__y  $023D
+
+.EQU CURSOR__P2__x  $023E
+.EQU CURSOR__P2__y  $023F
 
 ;0 --> 1
 ;1 --> 2
 .EQU current__PLAYER $0240
+
+; HDMA reads this table during rendering, so keep it away from
+; OAM shadow RAM ($0000-$021F) and normal game variables.
+.EQU HDMA_table  $0300
 
 ; M A I N  C O D E
 ; where the processor goes on reset
@@ -110,14 +123,16 @@ Start:
     stz PILL__player__offset
     stz PILL__player__direction
 
-    lda #$06
+    lda #$03
     sta sprite__wait
 
     lda #$90
     sta CURSOR__P1__x
+    sta CURSOR__P2__x
     
     lda #$60
     sta CURSOR__P1__y
+    sta CURSOR__P2__y
     
     stz current__PLAYER
     ;------------------------------------------------------
@@ -188,8 +203,8 @@ Start:
     lda #%00001010
     sta $0200
 
-    ;jsr MAKE__HDMAtable
-    ;jsr InitHDMA
+    jsr MAKE__HDMAtable
+    jsr InitHDMA
 
     ; turn on screen full brightness
     lda #$0F
@@ -211,11 +226,22 @@ forever:
     ; --> display title
     ;----------------------------------------------------------
 
-
     ;GAME 
     ;----------------------------------------------------------
+    ;only show sprite if board is non-zero
+    lda BOARD_00
+    bne +
+
+    lda BOARD_01
+    bne +
+
+    lda BOARD_02
+    bne + 
+
+    bra done_with_anim
+
     ;set x 
-    lda sprite__00__P1__x
++   lda sprite__00__P1__x
     sta $0004
     
     ;set y 
@@ -225,11 +251,11 @@ forever:
     ;first tile
     sep #$10
     ldx sprite__00__P1__sprite
-    lda.l sprite__O__indices, X
+    lda.l sprite__X__indices, X
     sta $0006
     rep #$10
     
-    lda #%00100000
+    lda #%00100001
     sta $0007
 
     ;enable 9th x-bits / Embiggen sprites
@@ -238,7 +264,7 @@ forever:
 
     ;animate sprite
     lda sprite__00__P1__sprite
-    cmp #$0D
+    cmp #$0B
     bne + 
     
     bra done_with_anim
@@ -256,109 +282,109 @@ forever:
  ;sprite 2
     ;---------------------------------
     ;set x (location 1) 
-    ;lda #$90
-    ;sta $0008
+    lda sprite__00__P2__x
+    sta $0008
     
     ;set y (screen.height * .5/height of sprite)
-    ;lda #$20
-    ;sta $0009
+    lda sprite__00__P2__y
+    sta $0009
     
     ;first tile
-    ;ldx sprite__00__P2__sprite
-    ;lda.l sprite__X__indices, X
-    ;sta $000A
+    ldx sprite__00__P2__sprite
+    lda.l sprite__O__indices, X
+    sta $000A
     
     ;set tile priority 
     ;high bit of tile number (0th)
-    ;lda #%00100001
-    ;sta $000B
+    lda #%00100000
+    sta $000B
 
     ;animate sprite
-    ;lda sprite__00__P2__sprite
-    ;cmp #$0B
-    ;bne + 
+    lda sprite__00__P2__sprite
+    cmp #$0D
+    bne + 
 
-    ;bra done_with_anim__2
-;+
-    ;lda sprite__00__P1__counter
-    ;cmp sprite__wait
-    ;bne +
+    bra done_with_anim__2
++
+    lda sprite__00__P1__counter
+    cmp sprite__wait
+    bne +
 
-    ;stz sprite__00__P2__counter
-    ;inc sprite__00__P2__sprite
+    stz sprite__00__P2__counter
+    inc sprite__00__P2__sprite
 
-    ;bne + 
-
-
-;+   inc sprite__00__P2__counter
++   inc sprite__00__P2__counter
 
 ; This animates the pill with the player # 
 ; displayed on it
 
-; done_with_anim__2:
+ done_with_anim__2:
     ; check direction 
     ; 0 is left, 1 is right
-    ;lda PILL__player__direction
-    ;cmp #$00
-    ;bne move_right
+    lda PILL__player__direction
+    cmp #$00
+    bne move_right
 
     ; if 0 
     ; check if we are at the max #$30    
-    ;rep #$20
-    ;lda PILL__player__offset
-    ;cmp #$0040 
-    ;bcc +
-    ;sep #$20
+    rep #$20
+    lda PILL__player__offset
+    cmp #$0040 
+    bcc +
+    sep #$20
 
     ; if we are, change direction
-    ;lda #$01 
-    ;sta PILL__player__direction
-    ;bra done_with_PILL
+    lda #$01 
+    sta PILL__player__direction
+    bra done_with_PILL
 
-;+   
++   
     ; move to the left (adc)
-    ;rep #$20
-    ;lda PILL__player__offset
-    ;clc 
-    ;adc #$0002
-    ;sta PILL__player__offset
-    ;sta HDMA_table+1
-    ;sep #$20
-    ;bra done_with_PILL
+    rep #$20
+    lda PILL__player__offset
+    clc 
+    adc #$0002
+    sta PILL__player__offset
+    sta HDMA_table+1
+    sep #$20
+    bra done_with_PILL
 
- ;move_right:
+ move_right:
     ; check if we are at #$00
-    ;rep #$20
-    ;lda PILL__player__offset
-    ;cmp #$0002 
-    ;bcs +
-    ;sep #$20
+    rep #$20
+    lda PILL__player__offset
+    cmp #$0002 
+    bcs +
+    sep #$20
     
     ; if 1
     ; if we are, change direction
-    ;lda #$00
-    ;sta PILL__player__direction
-    ;bra done_with_PILL
+    lda #$00
+    sta PILL__player__direction
+    bra done_with_PILL
 
     ; move to the right (sbc)
-;+   rep #$20
-    ;lda PILL__player__offset
-    ;sec 
-    ;sbc #$0002
-    ;sta PILL__player__offset
-    ;sta HDMA_table+1
-    ;sep #$20
++   rep #$20
+    lda PILL__player__offset
+    sec 
+    sbc #$0002
+    sta PILL__player__offset
+    sta HDMA_table+1
+    sep #$20
     
  done_with_PILL:
     
     ; SEE WHO IS THE CURRENT PLAYER
     ;---------------------------------
-    ;lda current__PLAYER
-    ;bpl player__02__CURSOR
+    lda current__PLAYER
+    beq show__P1__cursor
+    
+    bra show__P2__cursor
 
     ; DISPLAY PLAYER 01 CURSOR
     ;---------------------------------
     ;set x (location 1)
+  show__P1__cursor:
     lda CURSOR__P1__x
     sta $0000   
 
@@ -377,8 +403,32 @@ forever:
     ;high bit of tile number (0th)
     lda #%00110000
     sta $0003
+    bra check_controls
     ;---------------------------------
 
+    ; DISPLAY PLAYER 02 CURSOR
+    ;---------------------------------
+    ;set x (location 1)
+  show__P2__cursor:
+    lda CURSOR__P2__x
+    sta $0000   
+
+    ;set y (screen.height * .5/height of sprite)
+    lda CURSOR__P2__y
+    ; something might be up with the sprite?
+    ; (i.e. how it is stored in RAM?)
+    dec a
+    sta $0001
+    
+    ;first tile
+    lda #$CC
+    sta $0002
+    
+    ;set tile priority 
+    ;high bit of tile number (0th)
+    lda #%00110000
+    sta $0003
+    ;---------------------------------
  check_controls:
     
  check__P1__UP:
@@ -564,6 +614,10 @@ forever:
     stz sprite__00__P1__counter
     stz sprite__00__P1__sprite
 
+    ; current player is now 2
+    inc current__PLAYER
+
+    bra done_with_P1CONTROL
     ; get which "coin" this is (1, 2, 3) 
     ; (ie do we need to switch phase)   
 
@@ -578,6 +632,170 @@ forever:
 
 
  done_with_P1CONTROL:
+
+
+ player__02__CURSOR:
+
+ check__P2__UP:
+    lda joy2H__p
+    and #%00001000
+    beq check__P2__DOWN
+
+    ;---------------------------
+    lda CURSOR__P2__y
+    cmp #$20
+    beq check__P2__DOWN
+
+    lda CURSOR__P2__y
+    sec
+    sbc #$40
+    sta CURSOR__P2__y
+    ;---------------------------
+
+ check__P2__DOWN:
+    lda joy2H__p
+    and #%00000100
+    beq check__P2__LEFT
+
+    ;---------------------------
+    lda CURSOR__P2__y
+    cmp #$A0
+    beq check__P2__LEFT
+
+    lda CURSOR__P2__y
+    clc
+    adc #$40
+    sta CURSOR__P2__y
+    ;---------------------------
+
+ check__P2__LEFT:
+    lda joy2H__p
+    and #%00000010
+    beq check__P2__RIGHT
+
+    ;---------------------------
+    lda CURSOR__P2__x
+    cmp #$50
+    beq check__P2__RIGHT
+
+    lda CURSOR__P2__x
+    sec
+    sbc #$40
+    sta CURSOR__P2__x
+    ;---------------------------
+
+ check__P2__RIGHT:
+    lda joy2H__p
+    and #%00000001
+    beq check__P2__A
+    
+    ;---------------------------
+    lda CURSOR__P2__x
+    cmp #$D0
+    beq check__P2__A
+
+    lda CURSOR__P2__x
+    clc
+    adc #$40
+    sta CURSOR__P2__x
+    ;---------------------------
+    
+ check__P2__A:
+    lda joy2L__p
+    and #%10000000
+    beq done_with_P2CONTROL
+
+    ; A PRESSED
+    ;---------------------------
+    ; current player is now 1
+    stz current__PLAYER
+
+    ldx #$00
+    ldy #$00
+
+    ; get the cursor x
+    lda CURSOR__P2__x
+
+    ;left 
+    cmp #$50
+    bne +
+
+    ldx #%00110000
+
++   ;middle
+    lda CURSOR__P2__x
+    cmp #$90
+    bne +
+
+    ldx #%00001100
+
++   ;assume right
+    ldx #%00000011
+
+    ; get the cursor y
+ A__check__P2__y:
+    ; top
+    lda CURSOR__P2__y
+    cmp #$20
+    bne +
+
+    ldy #$00
+
++   ; middle 
+    lda CURSOR__P2__y
+    cmp #$60
+    bne +
+
+    ldy #$01
+
++   ; bottom 
+    ldy #$02
+
+    ; use x & y to determine where in the
+    ; "board bits" it will go
+    ; make sure it is not already taken 
+
+    txa 
+    and BOARD_00, Y
+
+    ; if it is not ZERO we will get out
+    ; cell is occupied
+    ; PUT SOMETHING TO SHOW "BAD" FEEDBACK
+    bne done_with_P2CONTROL 
+    
+    ; in drop phase, 
+    ; set the board bit as occupied    
+    txa 
+    cmp #%00110000
+    bne +
+
+    lda #%00100000
+    bra @set_board_bits
+
++   txa
+    cmp #%00001100
+    bne + 
+
+    lda #%00001000
+    bra @set_board_bits
+
++   lda #%00000010
+
+ @set_board_bits:
+    sta BOARD_00, Y
+    lda CURSOR__P2__x
+    sta sprite__00__P2__x
+
+    lda CURSOR__P2__y
+    sta sprite__00__P2__y
+
+    stz sprite__00__P2__counter
+    stz sprite__00__P2__sprite
+
+    jmp forever
+
+ done_with_P2CONTROL:
+    ;---------------------------------
     ; --> drop phase
     ; ----> select the write pills
     
@@ -659,7 +877,7 @@ VBlank:
     sta $420B
     ;---------------------------------
 
-    ; CONTROLLER
+    ; CONTROLLERS
     ;-------------------------------------
     ; get joypad status
     ; wait until it is ready
@@ -668,6 +886,8 @@ VBlank:
     and #$01
     bne -
     
+    ;P1 
+    ;---------------------------------
     ;read controller 1 high
     ;store current in Y (for p)
     ldy joy1H__c
@@ -707,6 +927,48 @@ VBlank:
     tya 
     and joy1L__c
     sta joy1L__h
+
+    ;P2
+    ;---------------------------------
+    ;read controller 2 high
+    ;store current in Y (for p)
+    ldy joy2H__c
+
+    ;get current
+    lda $421B
+    sta joy2H__c
+
+    ;switch
+    tya 
+    
+    ;figure out new presses (p)
+    ;figure out what was held (h)
+    eor joy2H__c
+    and joy2H__c
+    sta joy2H__p
+    tya 
+    and joy2H__c
+    sta joy2H__h
+
+    ;read controller 2 high
+    ;store current in Y (for p)
+    ldy joy2L__c
+
+    ;get current
+    lda $421A
+    sta joy2L__c
+
+    ;switch
+    tya 
+    
+    ;figure out new presses (p)
+    ;figure out what was held (h)
+    eor joy2L__c
+    and joy2L__c
+    sta joy2L__p
+    tya 
+    and joy2L__c
+    sta joy2L__h
 
     ;HDMA stuff
     stz $210D
