@@ -77,18 +77,26 @@
 .EQU joy2L__p   $0238
 .EQU joy2L__h   $0239
 
-.EQU PILL__player__offset  $023A
-.EQU PILL__player__direction $023B
+.EQU PILL__player__offset  $023A ; 16-bit value, uses $023A-$023B
+.EQU PILL__player__direction $023C
 
-.EQU CURSOR__P1__x  $023C
-.EQU CURSOR__P1__y  $023D
+.EQU CURSOR__P1__x  $023D
+.EQU CURSOR__P1__y  $023E
 
-.EQU CURSOR__P2__x  $023E
-.EQU CURSOR__P2__y  $023F
+.EQU CURSOR__P2__x  $023F
+.EQU CURSOR__P2__y  $0240
+
+.EQU CURSOR__blink__counter $0243
+.EQU CURSOR__blink__max $0244
+
+.EQU scratch__ptr $0245 
+;& --> $0246
 
 ;0 --> 1
 ;1 --> 2
-.EQU current__PLAYER $0240
+.EQU current__PLAYER $0241
+
+.EQU BG02__update $0242
 
 ; HDMA reads this table during rendering, so keep it away from
 ; OAM shadow RAM ($0000-$021F) and normal game variables.
@@ -135,6 +143,11 @@ Start:
     sta CURSOR__P2__y
     
     stz current__PLAYER
+
+    stz CURSOR__blink__counter
+
+    lda #$0A
+    sta CURSOR__blink__max
     ;------------------------------------------------------
 
     ; LOAD GRAPHICS
@@ -238,7 +251,7 @@ forever:
     lda BOARD_02
     bne + 
 
-    bra done_with_anim
+    bra done_with_anim__2
 
     ;set x 
 +   lda sprite__00__P1__x
@@ -279,7 +292,7 @@ forever:
 +   inc sprite__00__P1__counter
 
  done_with_anim:
- ;sprite 2
+    ;sprite 2
     ;---------------------------------
     ;set x (location 1) 
     lda sprite__00__P2__x
@@ -306,7 +319,7 @@ forever:
 
     bra done_with_anim__2
 +
-    lda sprite__00__P1__counter
+    lda sprite__00__P2__counter
     cmp sprite__wait
     bne +
 
@@ -326,7 +339,7 @@ forever:
     bne move_right
 
     ; if 0 
-    ; check if we are at the max #$30    
+    ; check if we are at the max 
     rep #$20
     lda PILL__player__offset
     cmp #$0040 
@@ -343,7 +356,7 @@ forever:
     rep #$20
     lda PILL__player__offset
     clc 
-    adc #$0002
+    adc #$0001
     sta PILL__player__offset
     sta HDMA_table+1
     sep #$20
@@ -353,8 +366,8 @@ forever:
     ; check if we are at #$00
     rep #$20
     lda PILL__player__offset
-    cmp #$0002 
-    bcs +
+    cmp #$0000
+    bne +
     sep #$20
     
     ; if 1
@@ -367,21 +380,14 @@ forever:
 +   rep #$20
     lda PILL__player__offset
     sec 
-    sbc #$0002
+    sbc #$0001
     sta PILL__player__offset
     sta HDMA_table+1
     sep #$20
     
  done_with_PILL:
     
-    ; SEE WHO IS THE CURRENT PLAYER
-    ;---------------------------------
-    lda current__PLAYER
-    beq show__P1__cursor
-    
-    bra show__P2__cursor
-
-    ; DISPLAY PLAYER 01 CURSOR
+   ; DISPLAY PLAYER 01 CURSOR
     ;---------------------------------
     ;set x (location 1)
   show__P1__cursor:
@@ -401,7 +407,27 @@ forever:
     
     ;set tile priority 
     ;high bit of tile number (0th)
+
+    ;process cursor blink
+    lda CURSOR__blink__counter
+    cmp CURSOR__blink__max
+    beq +
+
+    inc CURSOR__blink__counter
+    bra check_controls
+
++    
+    stz CURSOR__blink__counter
+
+    lda $0003
+    and #%00000001
+    beq +
+
     lda #%00110000
+    sta $0003
+    bra check_controls
++
+    lda #%00110001
     sta $0003
     bra check_controls
     ;---------------------------------
@@ -1113,28 +1139,28 @@ MAKE__HDMAtable:
 .SECTION "graphic_and_audio__includes"
 
 ; all the tiles for the game board
-bg__palette:
+ bg__palette:
     .incbin "_graphics/TAPATAN__bg.clr"
-bg__tiles:
+ bg__tiles:
     .incbin "_graphics/TAPATAN__bg.pic"
 
 ; tiles for "coin" sprites, and cursor
-sprites__palette: 
+ sprites__palette: 
     .incbin "_graphics/TAPATAN__sprites__v02.clr"
-sprites__tiles: 
+ sprites__tiles: 
     .incbin "_graphics/TAPATAN__sprites__v02.pic"
 
 ; sound stuff
-spc_program:
+ spc_program:
     .incbin "spc__playWithCollide.bin"
     .incbin "audio/guitar_palmmuted__C__32k.BRR"
-spcend:
+ spcend:
         .db $FF
 
-rando_map:
+ rando_map:
     .incbin "random_tilemap.bin"
 
-tilemap__BG01:
+ tilemap__BG01:
     .dw $4006, $0008, $0004, $4004, $4008, $8004, $C002, $4004, $0006, $0004, $0006, $0006, $8004, $8006, $8006, $8002, $8002, $C002, $0002, $0004, $8008, $0008, $0002, $4008, $4008, $4006, $8006, $C006, $8008, $0002, $4008, $0002        
     .dw $4004, $4006, $4004, $C006, $4004, $8004, $4006, $0006, $8004, $4008, $0002, $8004, $8004, $4006, $8004, $4004, $4008, $8008, $8006, $C002, $4006, $8002, $0006, $C004, $4008, $8004, $8008, $C006, $4006, $8008, $C008, $0002        
     .dw $C004, $C004, $0002, $C004, $4006, $000A, $400A, $0024, $0024, $000A, $400A, $0024, $0024, $000A, $400A, $8008, $C006, $4008, $0002, $4006, $C008, $C002, $C006, $4004, $0002, $8004, $8008, $C004, $0008, $4004, $0008, $0008        
@@ -1152,7 +1178,7 @@ tilemap__BG01:
     .dw $8006, $0002, $C008, $4004, $8004, $C006, $8006, $0006, $0006, $0006, $C008, $4004, $4004, $0008, $8002, $4008, $8002, $4002, $8008, $8004, $8004, $0004, $C002, $0006, $4004, $8008, $C002, $8006, $C008, $C002, $0004, $4006      
     .dw $4006, $0008, $0004, $4004, $4008, $8004, $C002, $4004, $0006, $0004, $0006, $0006, $8004, $8006, $8006, $8002, $8002, $C002, $0002, $0004, $8008, $0008, $0002, $4008, $4008, $4006, $8006, $C006, $8008, $0002, $4008, $0002        
 
-tilemap__BG02__drop:
+ tilemap__BG02__drop:
     .dw $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
     .dw $0040, $0042, $0044, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
     .dw $0048, $004A, $004A, $4048, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
@@ -1169,7 +1195,7 @@ tilemap__BG02__drop:
     .dw $004C, $004E, $004E, $404C, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
     .dw $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
 
-tilemap__BG02__move:
+ tilemap__BG02__move:
     .dw $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
     .dw $0040, $0042, $0046, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
     .dw $0048, $004A, $004A, $4048, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
@@ -1186,12 +1212,13 @@ tilemap__BG02__move:
     .dw $004C, $004E, $004E, $404C, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
     .dw $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
 
-sprite__O__indices:
+ sprite__O__indices:
     .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C, $C0, $C4
 
-sprite__X__indices:
+ sprite__X__indices:
     .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C
+
+
 
 ;---------------------------------------------------------------
 .ENDS
-cd
