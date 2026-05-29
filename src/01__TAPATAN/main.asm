@@ -387,38 +387,47 @@ forever:
     
  done_with_PILL:
     
-   ; DISPLAY PLAYER 01 CURSOR
+    ; DISPLAY CURSOR
     ;---------------------------------
     ;set x (location 1)
-  show__P1__cursor:
-    lda CURSOR__P1__x
-    sta $0000   
+ draw_cursor: 
+    ;get current player
+    ;shift because we have x and y 
+    ;next to each other
+    lda current__PLAYER
+    asl a 
+    tax
 
-    ;set y (screen.height * .5/height of sprite)
-    lda CURSOR__P1__y
-    ; something might be up with the sprite?
-    ; (i.e. how it is stored in RAM?)
-    dec a
+    ;transfer cursor location
+    lda CURSOR__P1__x, X
+    sta $0000
+
+    lda CURSOR__P1__y, X
+    dec a 
     sta $0001
-    
-    ;first tile
-    lda #$C8
+
+    ;get tile based on table (below)
+    lda current__PLAYER
+    tax
+    lda.l CURSOR__tile, X
     sta $0002
-    
-    ;set tile priority 
-    ;high bit of tile number (0th)
 
     ;process cursor blink
     lda CURSOR__blink__counter
     cmp CURSOR__blink__max
     beq +
 
+    ;increment counter
     inc CURSOR__blink__counter
     bra check_controls
 
-+    
++   
+    ;reset cursor
     stz CURSOR__blink__counter
 
+    ;see if it is on screen 
+    ;or not
+    ;switch bit
     lda $0003
     and #%00000001
     beq +
@@ -426,35 +435,11 @@ forever:
     lda #%00110000
     sta $0003
     bra check_controls
-+
-    lda #%00110001
+
++   lda #%00110001
     sta $0003
     bra check_controls
-    ;---------------------------------
 
-    ; DISPLAY PLAYER 02 CURSOR
-    ;---------------------------------
-    ;set x (location 1)
-  show__P2__cursor:
-    lda CURSOR__P2__x
-    sta $0000   
-
-    ;set y (screen.height * .5/height of sprite)
-    lda CURSOR__P2__y
-    ; something might be up with the sprite?
-    ; (i.e. how it is stored in RAM?)
-    dec a
-    sta $0001
-    
-    ;first tile
-    lda #$CC
-    sta $0002
-    
-    ;set tile priority 
-    ;high bit of tile number (0th)
-    lda #%00110000
-    sta $0003
-    ;---------------------------------
  check_controls:
     
  check__P1__UP:
@@ -1130,6 +1115,12 @@ MAKE__HDMAtable:
     rts
 ;---------------------------------------------------------------
 ; (END of SUBROUTINES)
+
+; data tables
+;---------------------------------------------------------------
+ CURSOR__tile:
+    .db $C8, $CC
+;---------------------------------------------------------------
 .ENDS
 
 ; graphics
