@@ -36,7 +36,7 @@ InitializeSNES:
   PLB
 
   LDA #$0000	;set Direct Page = $0000
-  TCD			;Transfer Accumulator to Direct Register
+  TCD			    ;Transfer Accumulator to Direct Register
 
   LDX $1FFD		;we clear all the mem at one point ...
   STX $4372  	;so save the return address in a place that won't get overwritten

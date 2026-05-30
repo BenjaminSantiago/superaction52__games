@@ -14,39 +14,41 @@
 .INCLUDE "inc/load_graphics.asm"
 
 ;variables
-;---------------------------------------------------------------'
-.EQU    gameMODE    $0221
+;---------------------------------------------------------------
 
 ; game modes
-;-----------
+;-------------------------------
 ; 00 --> title
 ; 01 --> options? 
 ; 02 --> game -> drop phase
 ; 03 --> game -> move phase
 ; 04 --> game -> game over
-
-.EQU    BOARD_00    $0222 ; -> 0224
-.EQU    BOARD_01    $0223
-.EQU    BOARD_02    $0224
+.EQU    gameMODE    $0221
 
 ; The BOARD 
-;----------
+;-------------------------------
 ; it has 9 locations, 3 rows of 3. 
 ; each location is represented by 2 bits 
 ; empty         -> 00
-; p1 occupied   -> 01
-; p2 occupied   -> 10
+; (p1) X occupied   ->  01
+; (p2) O occupied   ->  10
 
 ; memory locations    
 ; 00 | 00 00 00 <-- $0222 TOP ROW
 ; 00 | 00 00 00 <-- $0223 MIDDLE ROW
 ; 00 | 00 00 00 <-- $0224 BOTTOM ROW
+.EQU    BOARD_00    $0222 ; -> 0224
+.EQU    BOARD_01    $0223
+.EQU    BOARD_02    $0224
+;-------------------------------
 
 ; how long to wait for sprite frames
-.EQU    sprite__wait    $0225
+.EQU    sprite__wait            $0225
 
 ; these should be for each coin
 ; counter for distance between sprites
+; GET RID OF THIS 
+;-------------------------------
 .EQU    sprite__00__P1__counter $0226
 ; which sprite we show
 .EQU    sprite__00__P1__sprite  $0227
@@ -59,8 +61,13 @@
 .EQU sprite__00__P2__sprite     $022B
 .EQU sprite__00__P2__x          $022C
 .EQU sprite__00__P2__y          $022D
+;-------------------------------
 
-;variables for controller
+; CONTROLLER
+; c --> "current"
+; p --> "pressed" this frame
+; h --> "held" from previous frame
+;-------------------------------
 .EQU joy1H__c   $022E
 .EQU joy1H__p   $022F
 .EQU joy1H__h   $0230
@@ -76,10 +83,16 @@
 .EQU joy2L__c   $0237
 .EQU joy2L__p   $0238
 .EQU joy2L__h   $0239
+;-------------------------------
 
-.EQU PILL__player__offset  $023A ; 16-bit value, uses $023A-$023B
-.EQU PILL__player__direction $023C
+;HDMA pills
+;-------------------------------
+.EQU PILL__player__offset       $023A ;16-bit value, uses $023A-$023B
+.EQU PILL__player__direction    $023C
+;-------------------------------
 
+;CURSOR
+;-------------------------------
 .EQU CURSOR__P1__x  $023D
 .EQU CURSOR__P1__y  $023E
 
@@ -87,16 +100,38 @@
 .EQU CURSOR__P2__y  $0240
 
 .EQU CURSOR__blink__counter $0243
-.EQU CURSOR__blink__max $0244
-
-.EQU scratch__ptr $0245 
-;& --> $0246
+.EQU CURSOR__blink__max     $0244
+;-------------------------------
 
 ;0 --> 1
 ;1 --> 2
-.EQU current__PLAYER $0241
+.EQU current__PLAYER        $0241
 
-.EQU BG02__update $0242
+; $2100, the register for this 
+; can only be read so we need a variable to hold this
+.EQU SCREEN__brightness     $0245
+
+;-------------------------------
+;when we draw the board this is where we are 0 - 8
+.EQU COIN__cell__index      $0246
+.EQU COIN__sOAMoffset       $0247
+
+;each COIN has a spriteINDEX
+;meaning which sprite it is displaying
+;this is from a table in memory
+
+;each coin has a counter to measure
+;wait between frames
+
+;each coin stores how many frames it has
+;(this is dumb but X and O animations
+;are different lengths, not gonna
+;optimize right now)
+.EQU COIN__anim__counters       $0250 ; --> $0258, 9 bytes
+.EQU COIN__anim__spriteINDEX    $0259 ; --> $0261, 9 bytes
+.EQU COIN__anim__finalFRAME     $0262 ; --> $026A, 9 bytes
+.EQU COIN__X_or_O               $026B ; --> $0273, 9 bytes
+;-------------------------------
 
 ; HDMA reads this table during rendering, so keep it away from
 ; OAM shadow RAM ($0000-$021F) and normal game variables.
@@ -115,6 +150,7 @@ Start:
 
     ;"initialize" the "variables"
     ;------------------------------------------------------
+    stz SCREEN__brightness
     stz gameMODE
     stz BOARD_00
     stz BOARD_01
@@ -131,6 +167,11 @@ Start:
     stz PILL__player__offset
     stz PILL__player__direction
 
+    stz current__PLAYER
+    stz CURSOR__blink__counter
+
+    stz COIN__cell__index
+
     lda #$03
     sta sprite__wait
 
@@ -141,13 +182,14 @@ Start:
     lda #$60
     sta CURSOR__P1__y
     sta CURSOR__P2__y
-    
-    stz current__PLAYER
-
-    stz CURSOR__blink__counter
 
     lda #$0A
     sta CURSOR__blink__max
+
+    lda #$04
+    sta COIN__sOAMoffset
+
+    ;need to zero out all the board bits
     ;------------------------------------------------------
 
     ; LOAD GRAPHICS
@@ -219,9 +261,6 @@ Start:
     jsr MAKE__HDMAtable
     jsr InitHDMA
 
-    ; turn on screen full brightness
-    lda #$0F
-    sta $2100
     ;------------------------------------------------------
 
 
@@ -241,97 +280,51 @@ forever:
 
     ;GAME 
     ;----------------------------------------------------------
-    ;only show sprite if board is non-zero
-    lda BOARD_00
-    bne +
-
-    lda BOARD_01
-    bne +
-
-    lda BOARD_02
-    bne + 
-
-    bra done_with_anim__2
-
-    ;set x 
-+   lda sprite__00__P1__x
-    sta $0004
-    
-    ;set y 
-    lda sprite__00__P1__y
-    sta $0005
-    
-    ;first tile
-    sep #$10
-    ldx sprite__00__P1__sprite
-    lda.l sprite__X__indices, X
-    sta $0006
-    rep #$10
-    
-    lda #%00100001
-    sta $0007
-
+@show__game__board:
     ;enable 9th x-bits / Embiggen sprites
-    lda #%00101010
+    lda #%10101010
     sta $0200
 
-    ;animate sprite
-    lda sprite__00__P1__sprite
-    cmp #$0B
-    bne + 
+    lda #%10101010
+    sta $0201
+
+    lda #%00001010
+    sta $0202
+
+    lda #$04
+    sta COIN__sOAMoffset
+    ;check each location to see if it is occupied
+    ;if so by who?
+
+    ;top row
+    lda BOARD_00
+
+    ;L
+    and #%00110000
+    beq @done_with_BOARD ;<-- if we get zero be out
+
+    ;check X
+    cmp #%00010000
+    beq @COIN__is__X
+
+    ;must be O
+    ldx COIN__cell__index
+    lda #$01
+    sta COIN__X_or_O, X
+
+    bra +
     
-    bra done_with_anim
+@COIN__is__X:
+    ldx COIN__cell__index
+    lda #$00
+    sta COIN__X_or_O, X
+
 +
-    lda sprite__00__P1__counter
-    cmp sprite__wait
-    bne +
+    jsr draw__COIN
 
-    stz sprite__00__P1__counter
-    inc sprite__00__P1__sprite
+@done_with_BOARD:
 
-+   inc sprite__00__P1__counter
-
- done_with_anim:
-    ;sprite 2
-    ;---------------------------------
-    ;set x (location 1) 
-    lda sprite__00__P2__x
-    sta $0008
-    
-    ;set y (screen.height * .5/height of sprite)
-    lda sprite__00__P2__y
-    sta $0009
-    
-    ;first tile
-    ldx sprite__00__P2__sprite
-    lda.l sprite__O__indices, X
-    sta $000A
-    
-    ;set tile priority 
-    ;high bit of tile number (0th)
-    lda #%00100000
-    sta $000B
-
-    ;animate sprite
-    lda sprite__00__P2__sprite
-    cmp #$0D
-    bne + 
-
-    bra done_with_anim__2
-+
-    lda sprite__00__P2__counter
-    cmp sprite__wait
-    bne +
-
-    stz sprite__00__P2__counter
-    inc sprite__00__P2__sprite
-
-+   inc sprite__00__P2__counter
-
-; This animates the pill with the player # 
-; displayed on it
-
- done_with_anim__2:
+@PILL__player__anim__intro:
     ; check direction 
     ; 0 is left, 1 is right
     lda PILL__player__direction
@@ -346,9 +339,6 @@ forever:
     bcc +
     sep #$20
 
-    ; if we are, change direction
-    lda #$01 
-    sta PILL__player__direction
     bra done_with_PILL
 
 +   
@@ -644,9 +634,6 @@ forever:
 
  done_with_P1CONTROL:
 
-
- player__02__CURSOR:
-
  check__P2__UP:
     lda joy2H__p
     and #%00001000
@@ -808,7 +795,7 @@ forever:
  done_with_P2CONTROL:
     ;---------------------------------
     ; --> drop phase
-    ; ----> select the write pills
+    ; ----> select the right pills
     
     ; ----> scroll pills 
     ; ----> start player 1
@@ -989,6 +976,17 @@ VBlank:
     sta $420C
 
     lda $4210
+
+    ;turn on screen
+    ;(if not on)
+    lda SCREEN__brightness
+    cmp #$0F
+    beq  +
+
+    inc SCREEN__brightness
+    lda SCREEN__brightness
+    sta $2100
++
     ;-----------------
 	ply
     plx
@@ -1114,12 +1112,117 @@ MAKE__HDMAtable:
     stz HDMA_table + 6
     rts
 ;---------------------------------------------------------------
+
+
+;---------------------------------------------------------------
+draw__COIN:
+    ;set x position
+    ldx COIN__cell__index    
+    lda.l COIN_X_values, X
+    ldx COIN__sOAMoffset
+    sta $0000, X
+    inc COIN__sOAMoffset
+
+    ;set y position
+    ldx COIN__cell__index    
+    lda.l COIN_Y_values, X
+    ldx COIN__sOAMoffset
+    sta $0000, X
+    inc COIN__sOAMoffset
+
+    ;set tile
+    ldx COIN__cell__index   
+    lda COIN__X_or_O, X
+    beq +
+    
+    sep #$10
+    ldx COIN__cell__index    
+    lda COIN__anim__spriteINDEX, X
+    tax 
+    lda.l sprite__O__indices, X
+    ldx COIN__sOAMoffset
+    sta $0000, X
+    rep #$10    
+    bra @inc__sOAMoffset
++
+    sep #$10
+    ldx COIN__cell__index    
+    lda COIN__anim__spriteINDEX, X
+    tax 
+    lda.l sprite__X__indices, X
+    ldx COIN__sOAMoffset
+    sta $0000, X
+    rep #$10    
+
+@inc__sOAMoffset:
+    inc COIN__sOAMoffset
+
+    ;other props
+    ldx COIN__cell__index   
+    lda COIN__X_or_O, X
+    beq +
+
+    ;coin is O (value is 1)
+    lda #%00100000
+    ldx COIN__sOAMoffset
+    sta $0000, X
+
+    lda #$0D
+    ldx COIN__cell__index
+    sta COIN__anim__finalFRAME, X
+    bra @sOAM__lastVALUE
++
+    ;coin is X (value is 0)
+    lda #%00100001
+    ldx COIN__sOAMoffset
+    sta $0000, X
+
+    lda #$0B
+    ldx COIN__cell__index
+    sta COIN__anim__finalFRAME, X
+
+@sOAM__lastVALUE:
+
+    inc COIN__sOAMoffset
+
+    ;process waiting/counters
+    ldx COIN__cell__index
+    lda COIN__anim__spriteINDEX, X
+    cmp COIN__anim__finalFRAME, X
+    bne + 
+    
+    rts
++
+    lda COIN__anim__counters, X
+    cmp sprite__wait
+    bne +
+
+    lda #$00
+    sta COIN__anim__counters, X
+    inc COIN__anim__spriteINDEX, X
+
++   inc COIN__anim__counters, X
+    rts
+;---------------------------------------------------------------
+
 ; (END of SUBROUTINES)
 
-; data tables
+; DATA TABLESf
 ;---------------------------------------------------------------
- CURSOR__tile:
+CURSOR__tile:
     .db $C8, $CC
+
+COIN_X_values:
+    .db $50, $90, $D0, $50, $90, $D0, $50, $90, $D0
+
+COIN_Y_values:
+    .db $20, $20, $20, $60, $60, $60, $A0, $A0, $A0 
+
+sprite__O__indices:
+    .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C, $C0, $C4
+
+ sprite__X__indices:
+    .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C
 ;---------------------------------------------------------------
 .ENDS
 
@@ -1202,14 +1305,6 @@ MAKE__HDMAtable:
     .dw $4060, $0068, $006A, $0060, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
     .dw $004C, $004E, $004E, $404C, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
     .dw $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000 
-
- sprite__O__indices:
-    .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C, $C0, $C4
-
- sprite__X__indices:
-    .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C
-
-
 
 ;---------------------------------------------------------------
 .ENDS
