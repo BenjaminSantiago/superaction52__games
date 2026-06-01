@@ -291,38 +291,78 @@ forever:
     lda #%00001010
     sta $0202
 
+    ; initial "shadow OAM" location
+    ; incremented by the DRAW coin subroutine
+    ; 0th sprite is the cursor $0000 - $0003
     lda #$04
     sta COIN__sOAMoffset
-    ;check each location to see if it is occupied
-    ;if so by who?
 
-    ;top row
-    lda BOARD_00
+    ldy #$00
+    sep #$10 
 
-    ;L
-    and #%00110000
-    beq @done_with_BOARD ;<-- if we get zero be out
+@row_loop:
+    ldx #$00
 
-    ;check X
-    cmp #%00010000
+@col_loop:
+    lda.l BOARD_masks, X
+    and BOARD_00, y 
+    beq @empty 
+    
+    ;check if X or O
+    cpx #$00
+    beq @shift__forLEFT
+
+    cpx #$01
+    beq @shift__forMIDDLE
+
+    bra @NOshift__forRIGHT
+
+@shift__forLEFT:
+    lsr a
+    lsr a
+@shift__forMIDDLE:
+    lsr a
+    lsr a
+
+@NOshift__forRIGHT:
+    cmp #%00000001
     beq @COIN__is__X
 
     ;must be O
+    phx
     ldx COIN__cell__index
     lda #$01
-    sta COIN__X_or_O, X
-
+    sta COIN__X_or_O, X 
+    plx
     bra +
     
 @COIN__is__X:
+    phx
     ldx COIN__cell__index
-    lda #$00
+    lda #$00    
     sta COIN__X_or_O, X
-
+    plx
 +
+
     jsr draw__COIN
 
+@empty: 
+    inc COIN__cell__index
+    lda COIN__cell__index
+    cmp #$09
+    beq @done_with_BOARD
+
+    inx
+    cpx #$03
+    bne @col_loop
+
+    iny 
+    cpy #$03
+    bne @row_loop
+
 @done_with_BOARD:
+    rep #$10
+    stz COIN__cell__index
 
 @PILL__player__anim__intro:
     ; check direction 
@@ -430,17 +470,22 @@ forever:
     sta $0003
     bra check_controls
 
- check_controls:
+    ; CONTROLS!
+    ;----------------------------------------------------
+check_controls:
+    lda current__PLAYER
+    beq @check__P1__UP
+    jmp @done_with_P1CONTROL
     
- check__P1__UP:
+@check__P1__UP:
     lda joy1H__p
     and #%00001000
-    beq check__P1__DOWN
+    beq @check__P1__DOWN
 
     ;---------------------------
     lda CURSOR__P1__y
     cmp #$20
-    beq check__P1__DOWN
+    beq @check__P1__DOWN
 
     lda CURSOR__P1__y
     sec
@@ -448,15 +493,15 @@ forever:
     sta CURSOR__P1__y
     ;---------------------------
 
- check__P1__DOWN:
+@check__P1__DOWN:
     lda joy1H__p
     and #%00000100
-    beq check__P1__LEFT
+    beq @check__P1__LEFT
 
     ;---------------------------
     lda CURSOR__P1__y
     cmp #$A0
-    beq check__P1__LEFT
+    beq @check__P1__LEFT
 
     lda CURSOR__P1__y
     clc
@@ -464,15 +509,15 @@ forever:
     sta CURSOR__P1__y
     ;---------------------------
 
- check__P1__LEFT:
+@check__P1__LEFT:
     lda joy1H__p
     and #%00000010
-    beq check__P1__RIGHT
+    beq @check__P1__RIGHT
 
     ;---------------------------
     lda CURSOR__P1__x
     cmp #$50
-    beq check__P1__RIGHT
+    beq @check__P1__RIGHT
 
     lda CURSOR__P1__x
     sec
@@ -480,15 +525,15 @@ forever:
     sta CURSOR__P1__x
     ;---------------------------
 
- check__P1__RIGHT:
+@check__P1__RIGHT:
     lda joy1H__p
     and #%00000001
-    beq check__P1__A
+    beq @check__P1__A
     
     ;---------------------------
     lda CURSOR__P1__x
     cmp #$D0
-    beq check__P1__A
+    beq @check__P1__A
 
     lda CURSOR__P1__x
     clc
@@ -496,84 +541,61 @@ forever:
     sta CURSOR__P1__x
     ;---------------------------
     
- check__P1__A:
+@check__P1__A:
+    ;check A
     lda joy1L__p
     and #%10000000
-    beq done_with_P1CONTROL
+    beq @done_with_P1CONTROL
 
-    ;x values
-    ;$50, $90, $D0
-    
-    ;y values
-    ;$20, $60, $A0
-
-    ; memory locations    
-    ; 00 | 00 00 00 <-- $0222 TOP ROW
-    ; 00 | 00 00 00 <-- $0223 MIDDLE ROW
-    ; 00 | 00 00 00 <-- $0224 BOTTOM ROW
-  
-    ; A PRESSED
-    ;---------------------------
-    ; set the sprite to start animating
-    ;stz sprite__00__P1__counter    
-    ;stz sprite__00__P1__sprite
-        ; use x and y for...x and y
-    ; sure there are better ways
-    ; to do this, but there are 9
-    ; locations so I need at least
-    ; 9 bits so idk, just using
-    ; the x and y
-
-    ; for x --> 
-    ; 00000011 --> LEFT
-    ; 00001100 --> MIDDLE
-    ; 00110000 --> RIGHT
-
-    ; for y --> 
-    ; 00 --> TOP
-    ; 01 --> MIDDLE
-    ; 02 --> BOTTOM
     ldx #$00
     ldy #$00
 
     ; get the cursor x
     lda CURSOR__P1__x
 
-    ;left 
+    ;check left 
     cmp #$50
     bne +
 
-    ldx #%00110000
+    ;it was left!
+    ldx #%00010000
+    bra @process__A__P1Y
 
-+   ;middle
++   ;check middle
     lda CURSOR__P1__x
     cmp #$90
     bne +
 
-    ldx #%00001100
+    ;it was middle!
+    ldx #%00000100
+    bra @process__A__P1Y
 
 +   ;assume right
-    ldx #%00000011
+    ldx #%00000001
 
     ; get the cursor y
- A__check__P1__y:
-    ; top
+@process__A__P1Y:
+    ; check top
     lda CURSOR__P1__y
     cmp #$20
     bne +
 
+    ;it was top!
     ldy #$00
+    bra @process__A__BOARDbits
 
-+   ; middle 
++   ; check middle 
     lda CURSOR__P1__y
     cmp #$60
     bne +
 
     ldy #$01
+    bra @process__A__BOARDbits
 
-+   ; bottom 
++   ; assume bottom 
     ldy #$02
 
+@process__A__BOARDbits:
     ; use x & y to determine where in the
     ; "board bits" it will go
     ; make sure it is not already taken 
@@ -584,41 +606,17 @@ forever:
     ; if it is not ZERO we will get out
     ; cell is occupied
     ; PUT SOMETHING TO SHOW "BAD" FEEDBACK
-    bne done_with_P1CONTROL 
+    bne @done_with_P1CONTROL 
     
-    ; in drop phase, 
-    ; set the board bit as occupied    
+@set_board_bits:
     txa 
-    cmp #%00110000
-    bne +
-
-    lda #%00010000
-    bra @set_board_bits
-
-+   txa
-    cmp #%00001100
-    bne + 
-
-    lda #%00000100
-    bra @set_board_bits
-
-+   lda #%00000001
-
- @set_board_bits:
+    ora BOARD_00, Y
     sta BOARD_00, Y
-    lda CURSOR__P1__x
-    sta sprite__00__P1__x
-
-    lda CURSOR__P1__y
-    sta sprite__00__P1__y
-
-    stz sprite__00__P1__counter
-    stz sprite__00__P1__sprite
-
+   
     ; current player is now 2
     inc current__PLAYER
 
-    bra done_with_P1CONTROL
+    jmp @done_with_P1CONTROL
     ; get which "coin" this is (1, 2, 3) 
     ; (ie do we need to switch phase)   
 
@@ -632,17 +630,20 @@ forever:
     ;---------------------------
 
 
- done_with_P1CONTROL:
+@done_with_P1CONTROL:
+    lda current__PLAYER
+    bne @check__P2__UP
+    jmp @done_with_P2CONTROL
 
- check__P2__UP:
+@check__P2__UP:
     lda joy2H__p
     and #%00001000
-    beq check__P2__DOWN
+    beq @check__P2__DOWN
 
     ;---------------------------
     lda CURSOR__P2__y
     cmp #$20
-    beq check__P2__DOWN
+    beq @check__P2__DOWN
 
     lda CURSOR__P2__y
     sec
@@ -650,15 +651,15 @@ forever:
     sta CURSOR__P2__y
     ;---------------------------
 
- check__P2__DOWN:
+@check__P2__DOWN:
     lda joy2H__p
     and #%00000100
-    beq check__P2__LEFT
+    beq @check__P2__LEFT
 
     ;---------------------------
     lda CURSOR__P2__y
     cmp #$A0
-    beq check__P2__LEFT
+    beq @check__P2__LEFT
 
     lda CURSOR__P2__y
     clc
@@ -666,15 +667,15 @@ forever:
     sta CURSOR__P2__y
     ;---------------------------
 
- check__P2__LEFT:
+@check__P2__LEFT:
     lda joy2H__p
     and #%00000010
-    beq check__P2__RIGHT
+    beq @check__P2__RIGHT
 
     ;---------------------------
     lda CURSOR__P2__x
     cmp #$50
-    beq check__P2__RIGHT
+    beq @check__P2__RIGHT
 
     lda CURSOR__P2__x
     sec
@@ -682,15 +683,15 @@ forever:
     sta CURSOR__P2__x
     ;---------------------------
 
- check__P2__RIGHT:
+@check__P2__RIGHT:
     lda joy2H__p
     and #%00000001
-    beq check__P2__A
+    beq @check__P2__A
     
     ;---------------------------
     lda CURSOR__P2__x
     cmp #$D0
-    beq check__P2__A
+    beq @check__P2__A
 
     lda CURSOR__P2__x
     clc
@@ -698,57 +699,63 @@ forever:
     sta CURSOR__P2__x
     ;---------------------------
     
- check__P2__A:
+@check__P2__A:
     lda joy2L__p
     and #%10000000
-    beq done_with_P2CONTROL
+    beq @done_with_P2CONTROL
 
-    ; A PRESSED
+    ;A PRESSED!
     ;---------------------------
-    ; current player is now 1
-    stz current__PLAYER
-
     ldx #$00
     ldy #$00
 
     ; get the cursor x
     lda CURSOR__P2__x
 
-    ;left 
+    ;check left 
     cmp #$50
     bne +
 
-    ldx #%00110000
+    ;it was left!
+    ldx #%00100000
+    bra @process__A__P2Y
 
-+   ;middle
++   ;check middle
     lda CURSOR__P2__x
     cmp #$90
     bne +
 
-    ldx #%00001100
+    ;it was middle!
+    ldx #%00001000
+    bra @process__A__P2Y
 
 +   ;assume right
-    ldx #%00000011
+    ldx #%00000010
 
     ; get the cursor y
- A__check__P2__y:
-    ; top
+@process__A__P2Y:
+    ; check top
     lda CURSOR__P2__y
     cmp #$20
     bne +
 
+    ;it was top!
     ldy #$00
+    bra @process__A__BOARDbits__P2
 
-+   ; middle 
++   ; check middle 
     lda CURSOR__P2__y
     cmp #$60
     bne +
 
+    ;it was middle!
     ldy #$01
+    bra @process__A__BOARDbits__P2
 
-+   ; bottom 
++   ; assume bottom 
     ldy #$02
 
+@process__A__BOARDbits__P2:
     ; use x & y to determine where in the
     ; "board bits" it will go
     ; make sure it is not already taken 
@@ -759,40 +766,17 @@ forever:
     ; if it is not ZERO we will get out
     ; cell is occupied
     ; PUT SOMETHING TO SHOW "BAD" FEEDBACK
-    bne done_with_P2CONTROL 
+    bne @done_with_P2CONTROL 
     
-    ; in drop phase, 
-    ; set the board bit as occupied    
+@set_board_bits__P2:
     txa 
-    cmp #%00110000
-    bne +
-
-    lda #%00100000
-    bra @set_board_bits
-
-+   txa
-    cmp #%00001100
-    bne + 
-
-    lda #%00001000
-    bra @set_board_bits
-
-+   lda #%00000010
-
- @set_board_bits:
+    ora BOARD_00, Y
     sta BOARD_00, Y
-    lda CURSOR__P2__x
-    sta sprite__00__P2__x
+   
+    ; current player is now 1
+    stz current__PLAYER
 
-    lda CURSOR__P2__y
-    sta sprite__00__P2__y
-
-    stz sprite__00__P2__counter
-    stz sprite__00__P2__sprite
-
-    jmp forever
-
- done_with_P2CONTROL:
+@done_with_P2CONTROL:
     ;---------------------------------
     ; --> drop phase
     ; ----> select the right pills
@@ -1116,6 +1100,8 @@ MAKE__HDMAtable:
 
 ;---------------------------------------------------------------
 draw__COIN:
+    phx
+    
     ;set x position
     ldx COIN__cell__index    
     lda.l COIN_X_values, X
@@ -1135,24 +1121,24 @@ draw__COIN:
     lda COIN__X_or_O, X
     beq +
     
-    sep #$10
+    
     ldx COIN__cell__index    
     lda COIN__anim__spriteINDEX, X
     tax 
     lda.l sprite__O__indices, X
     ldx COIN__sOAMoffset
     sta $0000, X
-    rep #$10    
+    
     bra @inc__sOAMoffset
 +
-    sep #$10
+    
     ldx COIN__cell__index    
     lda COIN__anim__spriteINDEX, X
     tax 
     lda.l sprite__X__indices, X
     ldx COIN__sOAMoffset
     sta $0000, X
-    rep #$10    
+    
 
 @inc__sOAMoffset:
     inc COIN__sOAMoffset
@@ -1191,7 +1177,7 @@ draw__COIN:
     cmp COIN__anim__finalFRAME, X
     bne + 
     
-    rts
+    bra @done
 +
     lda COIN__anim__counters, X
     cmp sprite__wait
@@ -1202,15 +1188,21 @@ draw__COIN:
     inc COIN__anim__spriteINDEX, X
 
 +   inc COIN__anim__counters, X
+
+@done:
+    plx
     rts
 ;---------------------------------------------------------------
 
 ; (END of SUBROUTINES)
 
-; DATA TABLESf
+; DATA TABLES
 ;---------------------------------------------------------------
 CURSOR__tile:
     .db $C8, $CC
+
+BOARD_masks: 
+    .db %00110000, %00001100, %00000011
 
 COIN_X_values:
     .db $50, $90, $D0, $50, $90, $D0, $50, $90, $D0
