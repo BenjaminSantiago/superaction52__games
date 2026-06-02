@@ -133,6 +133,8 @@
 .EQU COIN__X_or_O               $026B ; --> $0273, 9 bytes
 ;-------------------------------
 
+.EQU is_GAME_paused             $0274
+
 ; HDMA reads this table during rendering, so keep it away from
 ; OAM shadow RAM ($0000-$021F) and normal game variables.
 .EQU HDMA_table  $0300
@@ -171,6 +173,8 @@ Start:
     stz CURSOR__blink__counter
 
     stz COIN__cell__index
+
+    stz is_GAME_paused
 
     lda #$03
     sta sprite__wait
@@ -280,6 +284,26 @@ forever:
 
     ;GAME 
     ;----------------------------------------------------------
+
+    ;check PAUSED 
+    ;before we do other stuff!
+    lda joy1H__p
+    and #%00010000
+    beq +
+
+    ;---------------------------
+    lda is_GAME_paused
+    eor #%00000001
+    sta is_GAME_paused
+    ;---------------------------
++
+    lda is_GAME_paused
+    beq @not_paused
+
+    jmp forever
+    ;---------------------------
+@not_paused:
+
 @show__game__board:
     ;enable 9th x-bits / Embiggen sprites
     lda #%10101010
@@ -363,6 +387,7 @@ forever:
 @done_with_BOARD:
     rep #$10
     stz COIN__cell__index
+  
 
 @PILL__player__anim__intro:
     ; check direction 
@@ -476,7 +501,7 @@ check_controls:
     lda current__PLAYER
     beq @check__P1__UP
     jmp @done_with_P1CONTROL
-    
+
 @check__P1__UP:
     lda joy1H__p
     and #%00001000
@@ -961,6 +986,20 @@ VBlank:
 
     lda $4210
 
+    lda is_GAME_paused
+    beq +
+
+    ; game is paused
+    lda SCREEN__brightness
+    cmp #$08
+    beq @end_interrupt
+    
+    dec SCREEN__brightness
+    lda SCREEN__brightness
+    sta $2100
+    bra @end_interrupt
+
++
     ;turn on screen
     ;(if not on)
     lda SCREEN__brightness
@@ -971,6 +1010,8 @@ VBlank:
     lda SCREEN__brightness
     sta $2100
 +
+
+@end_interrupt:
     ;-----------------
 	ply
     plx
