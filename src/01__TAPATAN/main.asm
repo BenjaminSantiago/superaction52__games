@@ -135,6 +135,10 @@
 
 .EQU is_GAME_paused             $0274
 
+.EQU is_there_a_WINNER          $0275
+
+.EQU scratch__BOARD_X           $0276
+
 ; HDMA reads this table during rendering, so keep it away from
 ; OAM shadow RAM ($0000-$021F) and normal game variables.
 .EQU HDMA_table  $0300
@@ -166,9 +170,6 @@ Start:
     stz sprite__00__P2__counter    
     stz sprite__00__P2__sprite
 
-    stz PILL__player__offset
-    stz PILL__player__direction
-
     stz current__PLAYER
     stz CURSOR__blink__counter
 
@@ -192,6 +193,14 @@ Start:
 
     lda #$04
     sta COIN__sOAMoffset
+
+    lda #$40
+    sta PILL__player__offset
+    lda #$01
+    sta PILL__player__direction
+
+    stz scratch__BOARD_X
+    stz is_there_a_WINNER
 
     ;need to zero out all the board bits
     ;------------------------------------------------------
@@ -291,10 +300,14 @@ forever:
     and #%00010000
     beq +
 
+    ; flip the pause bit
     ;---------------------------
     lda is_GAME_paused
     eor #%00000001
     sta is_GAME_paused
+
+    ; actually dimming is handled 
+    ; in the VBLANK
     ;---------------------------
 +
     lda is_GAME_paused
@@ -303,6 +316,89 @@ forever:
     jmp forever
     ;---------------------------
 @not_paused:
+
+@check_WINNER:
+    ;check HORIZONTALS
+
+    ;p1
+@p1_check_horizontals:
+    lda BOARD_00
+    cmp #%00010101
+    beq @P1_wins
+    
+    lda BOARD_01
+    cmp #%00010101
+    beq @P1_wins
+
+    lda BOARD_02
+    cmp #%00010101
+    beq @P1_wins
+
+    ;p2
+@p2_check_horizontals:
+    lda BOARD_00
+    cmp #%00101010
+    beq @P2_wins
+
+    lda BOARD_01
+    cmp #%00101010
+    beq @P2_wins
+
+    lda BOARD_02
+    cmp #%00101010
+    beq @P2_wins
+
+;check verticals now
+@p1_check_col00row00:
+    lda BOARD_00
+    and #%00010000
+    bne @p1_check_col00row01
+
+    ;bra to next thing
+    bra @show__game__board
+
+@p1_check_col00row01:
+    lda BOARD_01
+    and #%00010000
+    bne @p1_check_col00row02
+
+    ;bra to next thing
+
+    bra @show__game__board
+
+;CHECK p1 column 1
+
+;CHECK p1 column 2
+
+;CHECK p1 diagonal c00r00 --> c02r02
+
+;CHECK p1 diagonal c02r00 --> c00r02
+
+;CHECK p2 column 0
+
+;CHECK p2 column 1
+
+;CHECK p2 column 2
+
+;CHECK p2 diagonal c00r00 --> c02r02
+
+;CHECK p2 diagonal c02r00 --> c00r02
+
+@p1_check_col00row02:
+    lda BOARD_02
+    and #%00010000
+    bne @P1_wins
+
+    bra @show__game__board
+@P1_wins:
+    lda #$01
+    sta is_there_a_WINNER
+    jmp forever 
+
+@P2_wins:
+    lda #$02
+    sta is_there_a_WINNER
+    jmp forever
 
 @show__game__board:
     ;enable 9th x-bits / Embiggen sprites
@@ -404,14 +500,17 @@ forever:
     bcc +
     sep #$20
 
+    lda #$01
+    sta PILL__player__direction
     bra done_with_PILL
 
 +   
     ; move to the left (adc)
     rep #$20
     lda PILL__player__offset
-    clc 
-    adc #$0001
+    asl 
+    ;clc 
+    ;adc #$0001
     sta PILL__player__offset
     sta HDMA_table+1
     sep #$20
@@ -427,15 +526,17 @@ forever:
     
     ; if 1
     ; if we are, change direction
-    lda #$00
-    sta PILL__player__direction
+    stz PILL__player__direction
+    lda #$01
+    sta PILL__player__offset
     bra done_with_PILL
 
     ; move to the right (sbc)
 +   rep #$20
     lda PILL__player__offset
-    sec 
-    sbc #$0001
+    lsr
+    ;sec 
+    ;sbc #$0001
     sta PILL__player__offset
     sta HDMA_table+1
     sep #$20
@@ -583,6 +684,9 @@ check_controls:
     bne +
 
     ;it was left!
+    lda #%00110000
+    sta scratch__BOARD_X
+
     ldx #%00010000
     bra @process__A__P1Y
 
@@ -592,10 +696,16 @@ check_controls:
     bne +
 
     ;it was middle!
+    lda #%00001100
+    sta scratch__BOARD_X
+
     ldx #%00000100
     bra @process__A__P1Y
 
 +   ;assume right
+    lda #%00000011
+    sta scratch__BOARD_X
+
     ldx #%00000001
 
     ; get the cursor y
@@ -625,7 +735,7 @@ check_controls:
     ; "board bits" it will go
     ; make sure it is not already taken 
 
-    txa 
+    lda scratch__BOARD_X
     and BOARD_00, Y
 
     ; if it is not ZERO we will get out
@@ -742,6 +852,8 @@ check_controls:
     bne +
 
     ;it was left!
+    lda #%00110000
+    sta scratch__BOARD_X    
     ldx #%00100000
     bra @process__A__P2Y
 
@@ -751,10 +863,16 @@ check_controls:
     bne +
 
     ;it was middle!
+    lda #%00001100
+    sta scratch__BOARD_X    
+
     ldx #%00001000
     bra @process__A__P2Y
 
 +   ;assume right
+    lda #%00000011
+    sta scratch__BOARD_X    
+
     ldx #%00000010
 
     ; get the cursor y
@@ -785,7 +903,7 @@ check_controls:
     ; "board bits" it will go
     ; make sure it is not already taken 
 
-    txa 
+    lda scratch__BOARD_X 
     and BOARD_00, Y
 
     ; if it is not ZERO we will get out
