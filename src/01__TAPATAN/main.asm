@@ -321,75 +321,168 @@ forever:
     ;check HORIZONTALS
 
     ;p1
+    ;-------------------------------
 @p1_check_horizontals:
     lda BOARD_00
     cmp #%00010101
-    beq @P1_wins
+    beq +
     
     lda BOARD_01
     cmp #%00010101
-    beq @P1_wins
+    beq +
 
     lda BOARD_02
     cmp #%00010101
-    beq @P1_wins
+    beq +
 
+    bra @p2_check_horizontals
+
++   jmp @P1_wins
+    ;-------------------------------
+
+    ;-------------------------------
     ;p2
 @p2_check_horizontals:
     lda BOARD_00
     cmp #%00101010
-    beq @P2_wins
+    beq +
 
     lda BOARD_01
     cmp #%00101010
-    beq @P2_wins
+    beq +
 
     lda BOARD_02
     cmp #%00101010
-    beq @P2_wins
+    beq +
+    
+    bra @p1_check_col00row00
 
-;check verticals now
++   jmp @P2_wins
+    ;-------------------------------
+
+    ;check verticals now
+    ;-------------------------------
 @p1_check_col00row00:
     lda BOARD_00
     and #%00010000
     bne @p1_check_col00row01
 
-    ;bra to next thing
-    bra @show__game__board
+    bra @p1_check_col01row00
 
 @p1_check_col00row01:
     lda BOARD_01
     and #%00010000
     bne @p1_check_col00row02
 
-    ;bra to next thing
-
-    bra @show__game__board
-
-;CHECK p1 column 1
-
-;CHECK p1 column 2
-
-;CHECK p1 diagonal c00r00 --> c02r02
-
-;CHECK p1 diagonal c02r00 --> c00r02
-
-;CHECK p2 column 0
-
-;CHECK p2 column 1
-
-;CHECK p2 column 2
-
-;CHECK p2 diagonal c00r00 --> c02r02
-
-;CHECK p2 diagonal c02r00 --> c00r02
+    ; check diagonal since we know
+    ; the first (upper left) coin was
+    ; placed
+    bra @p1_check_DIAG_LtoR__part01
 
 @p1_check_col00row02:
     lda BOARD_02
     and #%00010000
     bne @P1_wins
 
+    ;don't fall through because 
+    ;we know this won't be L to R diagonal
+    bra @p1_check_col01row00
+    ;-------------------------------
+    
+    ;CHECK p1 diagonal L to R
+    ;-------------------------------
+@p1_check_DIAG_LtoR__part01:
+    lda BOARD_01
+    and #%00000100
+    bne @p1_check_DIAG_LtoR__part02
+
+    bra @p1_check_col01row00
+
+@p1_check_DIAG_LtoR__part02:
+    lda BOARD_02
+    and #%00000001
+    bne @P1_wins
+    ;-------------------------------
+    
+    ;CHECK p1 column 1
+    ;-------------------------------
+@p1_check_col01row00:
+    lda BOARD_00
+    and #%00000100
+    bne @p1_check_col01row01
+
+    bra @p1_check_col02row00
+
+@p1_check_col01row01:
+    lda BOARD_01
+    and #%00000100
+    bne @p1_check_col01row02
+
+    bra @p1_check_col02row00
+
+@p1_check_col01row02:
+    lda BOARD_02
+    and #%00000100
+    bne @P1_wins
+    ;-------------------------------
+
+    ;CHECK p1 column 2
+    ;-------------------------------
+@p1_check_col02row00:
+    lda BOARD_00
+    and #%00000001
+    bne @p1_check_col01row01
+
     bra @show__game__board
+
+@p1_check_col02row01:
+    lda BOARD_01
+    and #%00000001
+    bne @p1_check_col01row02
+
+    bra @p1_check_DIAG_RtoL__part01
+
+@p1_check_col02row02:
+    lda BOARD_02
+    and #%00000001
+    bne @P1_wins    
+    ;-------------------------------
+
+    ;CHECK p1 diagonal R to L
+    ;-------------------------------    
+@p1_check_DIAG_RtoL__part01:
+    lda BOARD_01
+    and #%00000100
+    bne @p1_check_DIAG_LtoR__part02
+
+    bra @show__game__board
+
+@p1_check_DIAG_RtoL__part02:
+    lda BOARD_02
+    and #%00010000
+    bne @P1_wins
+    
+    bra @show__game__board
+    ;-------------------------------
+    
+    ;CHECK p2 column 
+    ;-------------------------------
+    ;-------------------------------
+
+    ;CHECK p2 column 1
+    ;-------------------------------
+    ;-------------------------------
+    ;CHECK p2 column 2
+    ;-------------------------------
+    ;-------------------------------
+
+    ;CHECK p2 diagonal c00r00 --> c02r02
+    ;-------------------------------
+    ;-------------------------------
+
+    ;CHECK p2 diagonal c02r00 --> c00r02
+    ;-------------------------------
+    ;-------------------------------
 @P1_wins:
     lda #$01
     sta is_there_a_WINNER
