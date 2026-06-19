@@ -293,28 +293,13 @@ forever:
 
     ;GAME 
     ;----------------------------------------------------------
-
-    ;check PAUSED 
-    ;before we do other stuff!
-    lda joy1H__p
-    and #%00010000
-    beq +
-
-    ; flip the pause bit
-    ;---------------------------
-    lda is_GAME_paused
-    eor #%00000001
-    sta is_GAME_paused
-
-    ; actually dimming is handled 
-    ; in the VBLANK
-    ;---------------------------
-+
-    lda is_GAME_paused
+    ; check if either player intends to 
+    ; pause or unpause the game
+    ; this will set the z flag 
+    ; based on is_GAME_paused flag
+    jsr CHECK__pause 
     beq @not_paused
-
     jmp forever
-    ;---------------------------
 @not_paused:
 
 @check_WINNER:
@@ -382,11 +367,14 @@ forever:
 @p1_check_col00row02:
     lda BOARD_02
     and #%00010000
-    bne @P1_wins
-
+    bne +
+        
     ;don't fall through because 
     ;we know this won't be L to R diagonal
     bra @p1_check_col01row00
+
++   jmp @P1_wins
+
     ;-------------------------------
     
     ;CHECK p1 diagonal L to R
@@ -401,7 +389,11 @@ forever:
 @p1_check_DIAG_LtoR__part02:
     lda BOARD_02
     and #%00000001
-    bne @P1_wins
+    bne +
+    
+    bra @p1_check_col01row00
+
++   jmp @P1_wins
     ;-------------------------------
     
     ;CHECK p1 column 1
@@ -423,7 +415,11 @@ forever:
 @p1_check_col01row02:
     lda BOARD_02
     and #%00000100
-    bne @P1_wins
+    bne +
+
+    bra @p1_check_col02row00
+
++   jmp @P1_wins
     ;-------------------------------
 
     ;CHECK p1 column 2
@@ -431,21 +427,25 @@ forever:
 @p1_check_col02row00:
     lda BOARD_00
     and #%00000001
-    bne @p1_check_col01row01
+    bne @p1_check_col02row01
 
-    bra @show__game__board
+    bra @p2_check_col00row00
 
 @p1_check_col02row01:
     lda BOARD_01
     and #%00000001
-    bne @p1_check_col01row02
+    bne @p1_check_col02row02
 
     bra @p1_check_DIAG_RtoL__part01
 
 @p1_check_col02row02:
     lda BOARD_02
     and #%00000001
-    bne @P1_wins    
+    bne +
+
+    bra @p1_check_DIAG_RtoL__part01
+
++   jmp @P1_wins    
     ;-------------------------------
 
     ;CHECK p1 diagonal R to L
@@ -453,35 +453,119 @@ forever:
 @p1_check_DIAG_RtoL__part01:
     lda BOARD_01
     and #%00000100
-    bne @p1_check_DIAG_LtoR__part02
+    bne @p1_check_DIAG_RtoL__part02
 
-    bra @show__game__board
+    jmp @p2_check_col00row00
 
 @p1_check_DIAG_RtoL__part02:
     lda BOARD_02
     and #%00010000
     bne @P1_wins
-    
-    bra @show__game__board
     ;-------------------------------
     
-    ;CHECK p2 column 
+    ;CHECK p2 column 0
     ;-------------------------------
+@p2_check_col00row00:
+    lda BOARD_00
+    and #%00100000
+    bne @p2_check_col00row01
+
+    bra @p2_check_col01row00
+
+@p2_check_col00row01:
+    lda BOARD_01
+    and #%00100000
+    bne @p2_check_col00row02
+
+    ; check diagonal since we know
+    ; the first (upper left) coin was
+    ; placed
+    bra @p2_check_DIAG_LtoR__part01
+
+@p2_check_col00row02:
+    lda BOARD_02
+    and #%00100000
+    bne @P2_wins
+
+    ;don't fall through because 
+    ;we know this won't be L to R diagonal
+    bra @p2_check_col01row00
+    ;-------------------------------
+    
+    ;CHECK p2 diagonal L to R
+    ;-------------------------------
+@p2_check_DIAG_LtoR__part01:
+    lda BOARD_01
+    and #%0001000
+    bne @p2_check_DIAG_LtoR__part02
+
+    bra @p2_check_col01row00
+
+@p2_check_DIAG_LtoR__part02:
+    lda BOARD_02
+    and #%00000010
+    bne @P2_wins
     ;-------------------------------
 
     ;CHECK p2 column 1
     ;-------------------------------
+@p2_check_col01row00:
+    lda BOARD_00
+    and #%00001000
+    bne @p2_check_col01row01
+
+    bra @p2_check_col02row00
+
+@p2_check_col01row01:
+    lda BOARD_01
+    and #%00001000
+    bne @p2_check_col01row02
+
+    bra @p2_check_col02row00
+
+@p2_check_col01row02:
+    lda BOARD_02
+    and #%00001000
+    bne @P2_wins
     ;-------------------------------
+    
     ;CHECK p2 column 2
     ;-------------------------------
+@p2_check_col02row00:
+    lda BOARD_00
+    and #%00000010
+    bne @p2_check_col02row01
+
+    bra @show__game__board
+
+@p2_check_col02row01:
+    lda BOARD_01
+    and #%00000010
+    bne @p2_check_col02row02
+
+    bra @p2_check_DIAG_RtoL__part01
+
+@p2_check_col02row02:
+    lda BOARD_02
+    and #%00000010
+    bne @P2_wins    
     ;-------------------------------
 
-    ;CHECK p2 diagonal c00r00 --> c02r02
+    ;CHECK p2 diagonal R to L
     ;-------------------------------
-    ;-------------------------------
+@p2_check_DIAG_RtoL__part01:
+    lda BOARD_01
+    and #%00001000
+    bne @p2_check_DIAG_RtoL__part02
 
-    ;CHECK p2 diagonal c02r00 --> c00r02
-    ;-------------------------------
+    bra @show__game__board
+
+@p2_check_DIAG_RtoL__part02:
+    lda BOARD_02
+    and #%00100000
+    bne @P2_wins
+    
+    bra @show__game__board
     ;-------------------------------
 @P1_wins:
     lda #$01
@@ -578,6 +662,14 @@ forever:
     stz COIN__cell__index
   
 
+ ; okay this just moves the pill
+ ; back and forth
+ ; what I want is to wait until the move condition is set
+ ; (switching player)
+ ; and then move back 
+ ; switch graphics
+ ; move forward
+ 
 @PILL__player__anim__intro:
     ; check direction 
     ; 0 is left, 1 is right
@@ -1443,6 +1535,24 @@ draw__COIN:
 
 @done:
     plx
+    rts
+;---------------------------------------------------------------
+
+; PAUSING
+;---------------------------------------------------------------
+CHECK__pause:
+    lda joy1H__p
+    ora joy2H__p
+    and #%00010000
+    beq @process_pause
+
+    lda is_GAME_paused
+    eor #%00000001
+    sta is_GAME_paused
+
+@process_pause:
+    ;use this to set Z flag
+    lda is_GAME_paused 
     rts
 ;---------------------------------------------------------------
 
