@@ -1,4 +1,4 @@
-;---------------------------------------------------------------
+f;---------------------------------------------------------------
 ; SUPER ACTION 52 --> WEEK 02 --> TAPATAN
 ; by Benjamin Santiago
 ;---------------------------------------------------------------
@@ -139,6 +139,11 @@
 
 .EQU scratch__BOARD_X           $0276
 
+.EQU PLAYER__changed            $0277
+
+.EQU COLOR__pink__MAX           $0288
+
+.EQU COLOR__pink__current       $028A
 ; HDMA reads this table during rendering, so keep it away from
 ; OAM shadow RAM ($0000-$021F) and normal game variables.
 .EQU HDMA_table  $0300
@@ -201,13 +206,24 @@ Start:
 
     stz scratch__BOARD_X
     stz is_there_a_WINNER
+    stz PLAYER__changed  
 
+    lda #$1F
+    sta COLOR__pink__MAX
+
+    lda #$7C
+    sta COLOR__pink__MAX + 1
+
+    stz COLOR__pink__current
+    stz COLOR__pink__current + 1
     ;need to zero out all the board bits
     ;------------------------------------------------------
 
     ; LOAD GRAPHICS
     ;------------------------------------------------------
     LoadPalette bg__palette,        0,      16 
+    LoadPalette bg__palette,        16,      16 
+    LoadPalette bg__palette,        32,      16 
     LoadPalette sprites__palette,   128,    16
     LoadBlockToVRAM bg__tiles,      $0000,  $1800
     LoadBlockToVRAM sprites__tiles, $2000,  $3800
@@ -660,7 +676,7 @@ forever:
 @done_with_BOARD:
     rep #$10
     stz COIN__cell__index
-  
+    
 
  ; okay this just moves the pill
  ; back and forth
@@ -669,8 +685,20 @@ forever:
  ; and then move back 
  ; switch graphics
  ; move forward
- 
+    
 @PILL__player__anim__intro:
+    lda PLAYER__changed
+    cmp #$00
+    bne +
+
+    ;errors with sprites if we don't do this
+    ;garbage trapped in accumulator
+    rep #$20
+    lda #$0000
+    sep #$20
+    bra done_with_PILL
++
+    stz PLAYER__changed
     ; check direction 
     ; 0 is left, 1 is right
     lda PILL__player__direction
@@ -721,7 +749,7 @@ forever:
     lda PILL__player__offset
     lsr
     ;sec 
-    ;sbc #$0001
+    ;sbc #$0001[[
     sta PILL__player__offset
     sta HDMA_table+1
     sep #$20
@@ -934,6 +962,8 @@ check_controls:
     sta BOARD_00, Y
    
     ; current player is now 2
+    lda #$01
+    sta PLAYER__changed
     inc current__PLAYER
 
     jmp @done_with_P1CONTROL
@@ -1103,7 +1133,8 @@ check_controls:
    
     ; current player is now 1
     stz current__PLAYER
-
+    lda #$01
+    sta PLAYER__changed
 @done_with_P2CONTROL:
     ;---------------------------------
     ; --> drop phase
@@ -1314,6 +1345,33 @@ VBlank:
     sta $2100
 +
 
+    lda #$03
+    sta $2121
+
+    ;PALETTE GLOW
+    ; we want to update
+    ; $13 --> pink
+    ; $23 --> blue
+    ;----------------------------
+    lda COLOR__pink__current
+    asl A
+    tax 
+
+    lda.l glow__cyan, X
+    sta $2122
+
+    lda.l glow__cyan + 1, x
+    sta $2122
+
+    lda GLOW__current
+    cmp #$19
+    bcc + 
+
+    stz GLOW__current
+    bra @end_interrupt
+
++   inc GLOW__current
+    ;----------------------------
 @end_interrupt:
     ;-----------------
 	ply
@@ -1577,6 +1635,62 @@ sprite__O__indices:
 
  sprite__X__indices:
     .db $00, $04, $08, $0C, $40, $44, $48, $4C, $80, $84, $88, $8C
+
+glow__pink:
+      .dw $7D34 ; R=$14 G=$09 B=$1F
+      .dw $7D15
+      .dw $7CF6
+      .dw $7CF7
+      .dw $7CD8
+      .dw $7CB8
+      .dw $7CB9
+      .dw $7C9A
+      .dw $7C9B
+      .dw $7C7B
+      .dw $7C5C
+      .dw $7C5D
+      .dw $7C3E
+      .dw $7C1F ; R=$1F G=$00 B=$1F
+      .dw $7C3E
+      .dw $7C5D
+      .dw $7C5C
+      .dw $7C7B
+      .dw $7C9B
+      .dw $7C9A
+      .dw $7CB9
+      .dw $7CB8
+      .dw $7CD8
+      .dw $7CF7
+      .dw $7CF6
+      .dw $7D15
+
+  glow__cyan:
+      .dw $7D34
+      .dw $7D72
+      .dw $7D91
+      .dw $7DD0
+      .dw $7E0E
+      .dw $7E4C
+      .dw $7E6B
+      .dw $7EA9
+      .dw $7EE8
+      .dw $7F26
+      .dw $7F64
+      .dw $7F83
+      .dw $7FE0
+      .dw $7F83
+      .dw $7F64
+      .dw $7F26
+      .dw $7EE8
+      .dw $7EA9
+      .dw $7E6B
+      .dw $7E4C
+      .dw $7E0E
+      .dw $7DD0
+      .dw $7D91
+      .dw $7D72
+      .dw $7D34
+      .dw $7D34
 ;---------------------------------------------------------------
 .ENDS
 
