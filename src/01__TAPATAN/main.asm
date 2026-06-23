@@ -1,4 +1,4 @@
-f;---------------------------------------------------------------
+;---------------------------------------------------------------
 ; SUPER ACTION 52 --> WEEK 02 --> TAPATAN
 ; by Benjamin Santiago
 ;---------------------------------------------------------------
@@ -141,9 +141,15 @@ f;---------------------------------------------------------------
 
 .EQU PLAYER__changed            $0277
 
-.EQU COLOR__pink__MAX           $0288
+.EQU COLOR__pink__MAX           $0278
 
-.EQU COLOR__pink__current       $028A
+.EQU GLOW__current              $027A
+
+.EQU connections__PINK          $027B ;+C
+.EQU connections__BLUE          $027D ;+E
+
+.EQU tilemap__holder            $027F ;+8A
+
 ; HDMA reads this table during rendering, so keep it away from
 ; OAM shadow RAM ($0000-$021F) and normal game variables.
 .EQU HDMA_table  $0300
@@ -208,14 +214,9 @@ Start:
     stz is_there_a_WINNER
     stz PLAYER__changed  
 
-    lda #$1F
-    sta COLOR__pink__MAX
-
-    lda #$7C
-    sta COLOR__pink__MAX + 1
-
-    stz COLOR__pink__current
-    stz COLOR__pink__current + 1
+    stz GLOW__current
+    stz connections__PINK
+    stz tilemap__holder
     ;need to zero out all the board bits
     ;------------------------------------------------------
 
@@ -676,7 +677,64 @@ forever:
 @done_with_BOARD:
     rep #$10
     stz COIN__cell__index
+
+    ; place winner check logic here
+; needs to wait specifically until 
+; all coins are drawn I guess
+
+;-----------------------------------
+; check connections here
+    lda #$0000
+
+; check
+    ;horizontal
+    ; c0r0 --> c1r0 
+    lda BOARD_00
+    ;check p1
+    and #%00010100
+    cmp #%00010100
+    beq +
+
+    bra @PILL__player__anim__intro
+
++   ;first two are connected 
+    lda #%00000001
+    sta connections__PINK
+
+    ; c1r0 --> c2r0
     
+
+
+    ; c0r1 --> c1r1
+    ; c1r1 --> c2r2
+
+    ; c0r2 --> c1r2
+    ; c1r2 --> c2r2
+
+    ; verticals
+    ; c0r0 --> c0r1
+    ; c1r0 --> c1r1
+    ; c2r0 --> c2r1
+
+    ; c0r1 --> c0r2
+    ; c1r1 --> c1r2
+    ; c2r1 --> c2r2
+
+    ;diagonal
+    ; c0r0 --> c1r1
+    ; c2r0 --> c1r1
+
+    ; c0r2 --> c1r1
+    ; c2r2 --> c1r1
+
+    ; for each of them check
+    ; is first place blue or pink
+    ; is second place blue or pink
+    ; if both are yes (either color)
+    ; get selected tiles of selected combination
+    ; change palette
+
+;-----------------------------------    
 
  ; okay this just moves the pill
  ; back and forth
@@ -1326,12 +1384,15 @@ VBlank:
     ; game is paused
     lda SCREEN__brightness
     cmp #$08
-    beq @end_interrupt
+    bne @dim_screen
+
+    jmp @end_interrupt
     
+@dim_screen:
     dec SCREEN__brightness
     lda SCREEN__brightness
     sta $2100
-    bra @end_interrupt
+    jmp @end_interrupt
 
 +
     ;turn on screen
@@ -1345,22 +1406,61 @@ VBlank:
     sta $2100
 +
 
-    lda #$03
-    sta $2121
-
     ;PALETTE GLOW
     ; we want to update
     ; $13 --> pink
     ; $23 --> blue
     ;----------------------------
-    lda COLOR__pink__current
+    lda connections__PINK
+    beq @end_interrupt
+
+    lda #$47
+    sta $2116
+    lda #$18
+    sta $2117
+
+    rep #$20
+    lda.l tilemap__BG01 + (71*2)
+    and #%1110001111111111
+    ora #%0000010000000000
+    sta tilemap__holder
+    lda #$0000
+    sep #$20
+
+    lda tilemap__holder
+    sta $2118
+    lda tilemap__holder+1
+    sta $2119
+
+    lda #$48
+    sta $2116
+    lda #$18
+    sta $2117
+
+    rep #$20
+    lda.l tilemap__BG01 + (72*2)
+    and #%1110001111111111
+    ora #%0000010000000000
+    sta tilemap__holder
+    lda #$0000
+    sep #$20
+    
+    lda tilemap__holder
+    sta $2118
+    lda tilemap__holder+1
+    sta $2119
+
+    lda #$13
+    sta $2121
+    
+    lda GLOW__current
     asl A
     tax 
 
-    lda.l glow__cyan, X
+    lda.l glow__pink, X
     sta $2122
 
-    lda.l glow__cyan + 1, x
+    lda.l glow__pink + 1, x
     sta $2122
 
     lda GLOW__current
