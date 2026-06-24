@@ -49,7 +49,44 @@
 .ENDM
 
 
+;============================================================================
+; change_palette_in_tilemap -> 
+;   change palette number of content that is already in vram
+;----------------------------------------------------------------------------
+; in (arguments) --> 
+;   1: address of tile (16 bit hex)
+;   2: calculated offset in tilemap (decimal)
+;   3: mask with palette number to actually change
+;       the tilemap entry (16 bit binary)
+;----------------------------------------------------------------------------
+; out --> nothing
+;----------------------------------------------------------------------------
+; modifies --> 
+;   in 65816 --> A 
+;   in SNES  --> VRAM ($2116, $2117, $2118, $2119)
+;   in data  --> 
+;       tilemap holder (scratch value)
+;----------------------------------------------------------------------------
+.MACRO change_palette_in_tilemap 
+    ;(16-bit A for this)
+    ;----------------------------------------
+    
+    ;which address we want to change
+    lda #\1
+    sta $2116
+    
+    ;get value we want to upload
+    lda.l tilemap__BG01 + (\2 * 2)
+    and #%1110001111111111
+    ora #\3
+    sta tilemap__holder
 
+    ;actually modify the tilemap entry
+    lda tilemap__holder
+    sta $2118  
+    ;----------------------------------------
+
+.ENDM
 
 ;============================================================================
 ; Routines

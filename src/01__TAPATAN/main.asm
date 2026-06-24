@@ -145,6 +145,25 @@
 
 .EQU GLOW__current              $027A
 
+; CONNECTIONS WORK LIKE THIS
+; --------------------------
+; they are spread across two bytes for each color
+ 
+; high byte       | low byte
+; F E D C B A 9 8 | 7 6 5 4 3 2 1 0
+; 
+; they equate to the board like this:
+; 
+; [O] - 0 - [O] - 1 - [O]
+;  |   \     |     /   |
+;  2     3   4   5     6
+;  |       \ | /       |
+; [O] - 7 - [O] - 8 - [O]
+;  |       / | \       |
+;  9     A   B   C     D
+;  |   /     |     \   |
+; [O] - E - [O] - F - [O]
+
 .EQU connections__PINK          $027B ;+C
 .EQU connections__BLUE          $027D ;+E
 
@@ -587,12 +606,13 @@ forever:
 @P1_wins:
     lda #$01
     sta is_there_a_WINNER
-    jmp forever 
+    ;jmp forever 
+    bra @show__game__board
 
 @P2_wins:
     lda #$02
     sta is_there_a_WINNER
-    jmp forever
+    ;jmp forever
 
 @show__game__board:
     ;enable 9th x-bits / Embiggen sprites
@@ -687,6 +707,7 @@ forever:
     lda #$0000
 
 ; check
+@CONNECT__check__pink__0:
     ;horizontal
     ; c0r0 --> c1r0 
     lda BOARD_00
@@ -695,36 +716,107 @@ forever:
     cmp #%00010100
     beq +
 
-    bra @PILL__player__anim__intro
+    bra @CONNECT__check__pink__1
 
 +   ;first two are connected 
     lda #%00000001
+    ora connections__PINK
     sta connections__PINK
 
+@CONNECT__check__pink__1:
     ; c1r0 --> c2r0
-    
+    lda BOARD_00
+    and #%00000101
+    cmp #%00000101
+    beq + 
 
+    bra @CONNECT__check__pink__7
 
++   lda #%00000010
+    ora connections__PINK
+    sta connections__PINK
+
+@CONNECT__check__pink__7:
     ; c0r1 --> c1r1
-    ; c1r1 --> c2r2
+    lda BOARD_01
+    and #%00010100
+    cmp #%00010100
+    beq +
 
+    bra @CONNECT__check__pink__8
+
++   lda #%10000000
+    ora connections__PINK
+    sta connections__PINK
+
+@CONNECT__check__pink__8:
+    ; c1r1 --> c2r2
+    lda BOARD_01
+    and #%00000101
+    cmp #%00000101
+    beq +
+
+    bra @CONNECT__check__pink__E
+
++   lda #%00000001
+    ora connections__PINK + 1
+    sta connections__PINK + 1
+
+@CONNECT__check__pink__E:
     ; c0r2 --> c1r2
+    lda BOARD_02
+    and #%00010100
+    cmp #%00010100
+    beq +
+
+    bra @CONNECT__check__pink__F
+
++   lda #%01000000
+    ora connections__PINK + 1
+    sta connections__PINK + 1
+@CONNECT__check__pink__F:    
     ; c1r2 --> c2r2
+    lda BOARD_02
+    and #%00000101
+    cmp #%00000101
+    beq +
+
+    bra @CONNECT__check__pink__2
+
++   lda #%10000000
+    ora connections__PINK + 1
+    sta connections__PINK + 1
 
     ; verticals
+@CONNECT__check__pink__2:        
     ; c0r0 --> c0r1
+
+@CONNECT__check__pink__4:        
     ; c1r0 --> c1r1
+
+@CONNECT__check__pink__6:        
     ; c2r0 --> c2r1
 
+@CONNECT__check__pink__9:        
     ; c0r1 --> c0r2
+
+@CONNECT__check__pink__B:            
     ; c1r1 --> c1r2
+
+@CONNECT__check__pink__D:            
     ; c2r1 --> c2r2
 
     ;diagonal
+@CONNECT__check__pink__3:        
     ; c0r0 --> c1r1
+
+@CONNECT__check__pink__5:            
     ; c2r0 --> c1r1
 
+@CONNECT__check__pink__A:        
     ; c0r2 --> c1r1
+
+@CONNECT__check__pink__C:        
     ; c2r2 --> c1r1
 
     ; for each of them check
@@ -1406,50 +1498,115 @@ VBlank:
     sta $2100
 +
 
+@check_connect_0:
+    lda connections__PINK
+    and #%00000001
+    cmp #%00000001
+    beq @process_pink_0
+
+    bra @check_connect_1
+
+@process_pink_0:
+    rep #$20
+
+    change_palette_in_tilemap $1847 71 %0000010000000000 
+    change_palette_in_tilemap $1848 72 %0000010000000000 
+
+    lda #$0000
+    tax  
+    sep #$20 
+    
+@check_connect_1:
+    lda connections__PINK
+    and #%00000010
+    cmp #%00000010
+    beq @process_pink_1
+    
+    jmp @check_connect_7
+
+@process_pink_1:
+    rep #$20
+
+    change_palette_in_tilemap $184B 75 %0000010000000000 
+    change_palette_in_tilemap $184C 76 %0000010000000000 
+
+    lda #$0000  
+    tax
+    sep #$20 
+
+@check_connect_7:
+    lda connections__PINK
+    and #%10000000
+    cmp #%10000000
+    beq @process_pink_7
+
+    jmp @check_connect_8
+
+@process_pink_7:
+    rep #$20
+
+    change_palette_in_tilemap $18C7 199 %0000010000000000 
+    change_palette_in_tilemap $18C8 200 %0000010000000000 
+
+    lda #$0000
+    sep #$20
+    
+@check_connect_8:
+    lda connections__PINK+1
+    and #%00000001
+    cmp #%00000001
+    beq @process_pink_8
+
+    jmp @check_connect_E
+
+@process_pink_8:
+    rep #$20
+
+    change_palette_in_tilemap $18CB 203 %0000010000000000 
+    change_palette_in_tilemap $18CC 204 %0000010000000000 
+
+    lda #$0000
+    sep #$20
+
+@check_connect_E:
+    lda connections__PINK+1
+    and #%01000000
+    cmp #%01000000
+    beq @process_pink_E
+
+    jmp @check_connect_F
+
+@process_pink_E:
+    rep #$20
+
+    change_palette_in_tilemap $1947 327 %0000010000000000 
+    change_palette_in_tilemap $1948 328 %0000010000000000 
+
+    lda #$0000
+    sep #$20
+
+@check_connect_F:
+    lda connections__PINK+1
+    and #%10000000
+    cmp #%10000000
+    beq @process_pink_F
+
+    bra @glow_up
+@process_pink_F:
+    rep #$20
+
+    change_palette_in_tilemap $194B 331 %0000010000000000 
+    change_palette_in_tilemap $194C 332 %0000010000000000 
+
+    lda #$0000
+    sep #$20
+
+@glow_up:
     ;PALETTE GLOW
     ; we want to update
     ; $13 --> pink
     ; $23 --> blue
     ;----------------------------
-    lda connections__PINK
-    beq @end_interrupt
-
-    lda #$47
-    sta $2116
-    lda #$18
-    sta $2117
-
-    rep #$20
-    lda.l tilemap__BG01 + (71*2)
-    and #%1110001111111111
-    ora #%0000010000000000
-    sta tilemap__holder
-    lda #$0000
-    sep #$20
-
-    lda tilemap__holder
-    sta $2118
-    lda tilemap__holder+1
-    sta $2119
-
-    lda #$48
-    sta $2116
-    lda #$18
-    sta $2117
-
-    rep #$20
-    lda.l tilemap__BG01 + (72*2)
-    and #%1110001111111111
-    ora #%0000010000000000
-    sta tilemap__holder
-    lda #$0000
-    sep #$20
-    
-    lda tilemap__holder
-    sta $2118
-    lda tilemap__holder+1
-    sta $2119
-
     lda #$13
     sta $2121
     
