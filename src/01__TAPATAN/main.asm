@@ -169,6 +169,8 @@
 
 .EQU tilemap__holder            $027F ;+8A
 
+.EQU change_player_PILL         $028B
+
 ; HDMA reads this table during rendering, so keep it away from
 ; OAM shadow RAM ($0000-$021F) and normal game variables.
 .EQU HDMA_table  $0300
@@ -226,7 +228,7 @@ Start:
 
     lda #$40
     sta PILL__player__offset
-    lda #$01
+    lda #$00
     sta PILL__player__direction
 
     stz scratch__BOARD_X
@@ -236,6 +238,7 @@ Start:
     stz GLOW__current
     stz connections__PINK
     stz tilemap__holder
+    stz change_player_PILL
     ;need to zero out all the board bits
     ;------------------------------------------------------
 
@@ -848,7 +851,6 @@ forever:
     sep #$20
     bra done_with_PILL
 +
-    stz PLAYER__changed
     ; check direction 
     ; 0 is left, 1 is right
     lda PILL__player__direction
@@ -863,6 +865,12 @@ forever:
     bcc +
     sep #$20
 
+    ;set flag for VBlank code
+    lda #$01
+    sta change_player_PILL
+
+    
+    ;change player direction
     lda #$01
     sta PILL__player__direction
     bra done_with_PILL
@@ -886,7 +894,11 @@ forever:
     cmp #$0000
     bne +
     sep #$20
-    
+
+    ;store zero in player changed
+    ;this ends animation
+    stz PLAYER__changed
+
     ; if 1
     ; if we are, change direction
     stz PILL__player__direction
@@ -899,7 +911,7 @@ forever:
     lda PILL__player__offset
     lsr
     ;sec 
-    ;sbc #$0001[[
+    ;sbc #$0001
     sta PILL__player__offset
     sta HDMA_table+1
     sep #$20
@@ -1282,9 +1294,10 @@ check_controls:
     sta BOARD_00, Y
    
     ; current player is now 1
-    stz current__PLAYER
     lda #$01
     sta PLAYER__changed
+    stz current__PLAYER
+
 @done_with_P2CONTROL:
     ;---------------------------------
     ; --> drop phase
@@ -1625,10 +1638,37 @@ VBlank:
     bcc + 
 
     stz GLOW__current
-    bra @end_interrupt
+    bra @player_pill_switch
 
 +   inc GLOW__current
     ;----------------------------
+@player_pill_switch:
+    lda change_player_PILL
+    beq @end_interrupt
+    rep #$20
+
+    ; VRAM word address of the tilemap cell to change.
+    ; BG2 is loaded at $1000.
+    ; address = $1000 + row*32 + col
+    lda #$1022        
+    sta $2116
+
+    lda #$0000
+    lda current__PLAYER
+    bne @pill__p2__value
+
+    lda #$0044
+    bra @pill_talk_to_VRAM
+    
+@pill__p2__value:
+    lda #$0046
+
+@pill_talk_to_VRAM:
+    sta $2118
+
+    sep #$20
+
+    stz change_player_PILL
 @end_interrupt:
     ;-----------------
 	ply
