@@ -64,7 +64,65 @@
 
 ;variables
 ;---------------------------------------------------------------
+; $0000 - $0200 -> virtual OAM low
+; $0200 - $0220 -> virtual OAM high
+; NEED TO ACCOUNT FOR DIRECT PAGE
 
+; CONTROLLER
+; c --> "current"
+; p --> "pressed" this frame
+; h --> "held" from previous frame
+
+; renumber this!
+;-------------------------------
+.EQU joy1H__c   $022E
+.EQU joy1H__p   $022F
+.EQU joy1H__h   $0230
+
+.EQU joy1L__c   $0231
+.EQU joy1L__p   $0232
+.EQU joy1L__h   $0233
+
+.EQU joy2H__c   $0234
+.EQU joy2H__p   $0235
+.EQU joy2H__h   $0236
+
+.EQU joy2L__c   $0237
+.EQU joy2L__p   $0238
+.EQU joy2L__h   $0239
+;-------------------------------
+
+; bit flags
+;-------------------------------
+;0 --> 1
+;1 --> 2
+.EQU current__PLAYER        $0241
+
+.EQU is_GAME_paused         $0274
+;-------------------------------
+
+; $2100, the register for this 
+; can only be read so we need a variable to hold this
+.EQU SCREEN__brightness     $0245
+
+
+.EQU rng                    $4269
+
+; game modes
+;-------------------------------
+; 00 --> title
+; 01 --> options? 
+; 02 --> game -> adventure mode
+; 03 --> game -> memorize mode
+; 04 --> game -> instrument mode
+; 05 --> game -> adventure mode --> tutorial
+; 06 --> game -> game over -> win
+; 07 --> game -> game over -> loss
+.EQU    gameMODE    $0221
+
+; HDMA reads this table during rendering, so keep it away from
+; OAM shadow RAM ($0000-$021F) and normal game variables.
+.EQU HDMA_table  $0300
 ;---------------------------------------------------------------
 
 ; M A I N  C O D E
@@ -86,15 +144,41 @@ Start:
     ;LoadBlockToVRAM bg__tiles,      $0000,  $1800
     ;------------------------------------------------------
 
+    ; TILE MAPS
+    ;------------------------------------------------------
+    ; increment after writing to $2119
+    lda #$80
+    sta $2115
+
+    ; tilemap offset --> $1000
+    ; tilemap size   --> 1 screen in either direction
+    lda #$10
+    sta $2107
+    
+    ; tilemap offset --> $1800
+    ; tilemap size   --> 1 screen in either direction
+    lda #$18
+    sta $2108 
+    
+    ; DMA the tile maps
+    LoadBlockToVRAM tilemap__BG02__drop, $1000, 1024 
+    LoadBlockToVRAM tilemap__BG01, $1800, 1024
+    ;------------------------------------------------------
+
+    ; SPRITES
+    ;------------------------------------------------------
     jsr SpriteInit
 
     ;16x16 and 32x32 sprites 
     ;address offset
-    ;lda #%01100001          
-    ;sta $2101
+    lda #%01100001          
+    sta $2101
+    ;------------------------------------------------------
 
+    ; START IT UP!
+    ;------------------------------------------------------
     jsr SetupVideo
-
+    
     ; we want BG 1 & BG 2 to be 16 x 16
     ; we want BG mode 1
     lda #%00110001
@@ -120,6 +204,9 @@ Start:
     sta $0200
 
     jsr InitHDMA
+
+    lda $4210
+    sta rng
     ;------------------------------------------------------
 
 ;M A I N  L O O P! 
@@ -150,25 +237,25 @@ VBlank:
     
     ; "shadow OAM" --> actual OAM
     ;---------------------------------
-    stz $4300
-
-    lda #$04
-    sta $4301
-
-    lda #$00
-    sta $4302
-    sta $4303
-
-    lda #$7E
-    sta $4304
-
-    lda #$20
-    sta $4305
-    lda #$02
-    sta $4306
-
-    lda #$01
-    sta $420B
+;    stz $4300
+;
+;    lda #$04
+;    sta $4301
+;
+;    lda #$00
+;    sta $4302
+;    sta $4303
+;
+;    lda #$7E
+;    sta $4304
+;
+;    lda #$20
+;    sta $4305
+;    lda #$02
+;    sta $4306
+;
+;    lda #$01
+;    sta $420B
     ;---------------------------------
 
     ; CONTROLLERS
@@ -263,176 +350,52 @@ VBlank:
     tya 
     and joy2L__c
     sta joy2L__h
+    ;-------------------------------------
 
     ;HDMA stuff
-    stz $210D
-    stz $210D
+    ;-------------------------------------
+;    stz $210D
+;    stz $210D
+;
+;    lda #$02
+;    sta $420C
+;
+;    lda $4210
+    ;-------------------------------------
 
-    lda #$02
-    sta $420C
-
-    lda $4210
-
+    ;PAUSE processing
+    ;-------------------------------------
+PAUSE_processing:
     lda is_GAME_paused
-    beq +
+    beq @check_bright
 
     ; game is paused
+    ; dim screen
+@check_dim:
     lda SCREEN__brightness
     cmp #$08
     bne @dim_screen
 
-    jmp @end_interrupt
+    bra @done_with_PAUSE
     
 @dim_screen:
     dec SCREEN__brightness
     lda SCREEN__brightness
     sta $2100
-    jmp @end_interrupt
-
-+
-    ;turn on screen
-    ;(if not on)
+    bra @done_with_PAUSE
+    
+@check_bright:
     lda SCREEN__brightness
     cmp #$0F
-    beq  +
+    beq  @done_with_PAUSE
 
+@brighten_screen:
     inc SCREEN__brightness
     lda SCREEN__brightness
     sta $2100
-+
+@done_with_PAUSE:
 
-@check_connect_0:
-    lda connections__PINK
-    and #%00000001
-    cmp #%00000001
-    beq @process_pink_0
-
-    bra @check_connect_1
-
-@process_pink_0:
-    rep #$20
-
-    change_palette_in_tilemap $1847 71 %0000010000000000 
-    change_palette_in_tilemap $1848 72 %0000010000000000 
-
-    lda #$0000
-    tax  
-    sep #$20 
-    
-@check_connect_1:
-    lda connections__PINK
-    and #%00000010
-    cmp #%00000010
-    beq @process_pink_1
-    
-    jmp @check_connect_7
-
-@process_pink_1:
-    rep #$20
-
-    change_palette_in_tilemap $184B 75 %0000010000000000 
-    change_palette_in_tilemap $184C 76 %0000010000000000 
-
-    lda #$0000  
-    tax
-    sep #$20 
-
-@check_connect_7:
-    lda connections__PINK
-    and #%10000000
-    cmp #%10000000
-    beq @process_pink_7
-
-    jmp @check_connect_8
-
-@process_pink_7:
-    rep #$20
-
-    change_palette_in_tilemap $18C7 199 %0000010000000000 
-    change_palette_in_tilemap $18C8 200 %0000010000000000 
-
-    lda #$0000
-    sep #$20
-    
-@check_connect_8:
-    lda connections__PINK+1
-    and #%00000001
-    cmp #%00000001
-    beq @process_pink_8
-
-    jmp @check_connect_E
-
-@process_pink_8:
-    rep #$20
-
-    change_palette_in_tilemap $18CB 203 %0000010000000000 
-    change_palette_in_tilemap $18CC 204 %0000010000000000 
-
-    lda #$0000
-    sep #$20
-
-@check_connect_E:
-    lda connections__PINK+1
-    and #%01000000
-    cmp #%01000000
-    beq @process_pink_E
-
-    jmp @check_connect_F
-
-@process_pink_E:
-    rep #$20
-
-    change_palette_in_tilemap $1947 327 %0000010000000000 
-    change_palette_in_tilemap $1948 328 %0000010000000000 
-
-    lda #$0000
-    sep #$20
-
-@check_connect_F:
-    lda connections__PINK+1
-    and #%10000000
-    cmp #%10000000
-    beq @process_pink_F
-
-    bra @glow_up
-@process_pink_F:
-    rep #$20
-
-    change_palette_in_tilemap $194B 331 %0000010000000000 
-    change_palette_in_tilemap $194C 332 %0000010000000000 
-
-    lda #$0000
-    sep #$20
-
-@glow_up:
-    ;PALETTE GLOW
-    ; we want to update
-    ; $13 --> pink
-    ; $23 --> blue
-    ;----------------------------
-    lda #$13
-    sta $2121
-    
-    lda GLOW__current
-    asl A
-    tax 
-
-    lda.l glow__pink, X
-    sta $2122
-
-    lda.l glow__pink + 1, x
-    sta $2122
-
-    lda GLOW__current
-    cmp #$19
-    bcc + 
-
-    stz GLOW__current
-    bra @end_interrupt
-
-+   inc GLOW__current
-    ;----------------------------
-@end_interrupt:
+end_interrupt:
     ;-----------------
 	ply
     plx
@@ -518,6 +481,19 @@ SetupVideo:
     plp
     rts
 ;---------------------------------------------------------------
+
+;-----------------------------
+refresh_RNG:
+
+    lda rng
+    asl 
+    bcc +
+    eor #$1D
+    +   
+    sta rng
+
+    rts
+;-----------------------------
 
 ;---------------------------------------------------------------
 .ENDS
