@@ -1,3 +1,7 @@
+;---------------------------------------------------------------
+; SUPER ACTION 52 --> WEEK 03 --> Text Game
+; by Benjamin Santiago
+;---------------------------------------------------------------
 
 ;includes
 ;---------------------------------------------------------------
@@ -11,7 +15,9 @@
 
 ;variables
 ;---------------------------------------------------------------
-
+.ASCIITABLE
+    MAP "A" TO "Z" = $00
+.ENDA
 ;---------------------------------------------------------------
 
 ;where the processor goes on reset
@@ -31,21 +37,61 @@ Start:
     rep #$10    
     sep #$20
 
+    ; BG MODE
     lda #%00001001
     sta $2105
    
     ; Load Palettes & Graphics
     ;---------------------------------
-    ;LoadPalette XXXX, 0,   16
-    ;LoadPalette XXXX, 128, 16
-    ;LoadBlockToVRAM sprite, $0000, $0800
+    LoadPalette Alphabet__01_palette, 0,   16
+
+    ; HOW TO MAKE SURE THESE NUMBERS ARE ACCURATE?
+    LoadBlockToVRAM Alphabet__01_graphic, $0000, $1000
     ;---------------------------------
 
+    ; set to increment when writing to $2118
+    lda #%10000000     
+    sta $2115
+
+    lda #$70            ; Set BG1's Tile Map offset
+    sta $2107           ; And the Tile Map size to 32x32
+
+    rep #$30
+
+    ; set the starting address for the tilemap
+    ; (it must be at $7000 because that is the end 
+    ; of where we are storing the character data)
+    ldx #$7000
+    stx $2116
+
+    ;get x 
+    ldx #$0000
+
+    ; just increment 
+    ; no actual map
+loop_for_bg:
+    lda.l howl, x
+    sta $2118   ;put tile number into VRAM low
+    inx
+    inx
+    cpx #howl_end-howl
+    bne loop_for_bg
+
+loop_for_empty:
+    lda #$0454
+    sta $2118
+    inx
+    inx
+    cpx #$0E00
+    bne loop_for_empty
+    ;(sprites don't matter yet)
+    ;---------------------------------
     ;put RAM "copy" of sprites offscreen
     jsr SpriteInit    
     
     ; Setup Video modes and other stuff, then turn on the screen
     jsr SetupVideo
+    ;---------------------------------
 
     ; Enable NMI
     lda #$81
@@ -97,6 +143,7 @@ _clr:
 	rts
 ;---------------------------------------------------------------
 
+;---------------------------------------------------------------
 InitSoundCPU:
     php
     pha
@@ -138,8 +185,7 @@ InitSoundCPU:
     pla
     plp
     rts
-    ;------------------------------------------------------
-
+;---------------------------------------------------------------
 
 ;set up the "general video"-type registers
 ;---------------------------------------------------------------
@@ -177,7 +223,7 @@ SetupVideo:
 	lda #%10100000
     sta $2101
 
-    lda #%00010000      ;Enable BG1
+    lda #%00010001      ;Enable BG1
     sta $212C
     
     lda #$0F
@@ -198,37 +244,15 @@ VBlank:
     rep #$10    
     sep #$20
 
-    ;check if bg is flashing
-    lda bg_flash
-    cmp #$01
-    bne +
+    ;-----------------------------------------
 
-    ;make BG blue ($72A5)
-    stz $2121
-    lda #$A5
-    sta $2122
-    lda #$72
-    sta $2122
-    jmp pre_setup
+    ;-----------------------------------------
 
-+
-    ;otherwise set to white ($7FFF)
-    stz $2121
-    lda #$FF
-    sta $2122
-    lda #$7F
-    sta $2122    
+    ply
+    plx
+    pla
 
-pre_setup:    
-
-    jsr SetupVideo
-    
-	PLY 
-	PLX 
-	PLA 
-
-    sep #$20
-    RTI
+    rti
 
 ;---------------------------------------------------------------
 .ENDS
@@ -238,7 +262,11 @@ pre_setup:
 .BANK 1 SLOT 0
 .ORG 0
 .SECTION "graphic_and_audio__includes"
+Alphabet__01_palette:
+    .INCBIN "_graphics/Alphabet__01_strip.clr"
+Alphabet__01_graphic:
+    .INCBIN "_graphics/Alphabet__01_strip.pic"
 
-
+    .INC "inc/howl.inc"
 ;---------------------------------------------------------------
 .ENDS
