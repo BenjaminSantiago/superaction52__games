@@ -166,9 +166,9 @@ _Loop09:
   BNE _Loop09
 
   ;**** clear WRAM ********
-
   STZ $2181		;set WRAM address to $000000
-  STZ $2182
+  lda #$01
+  sta $2182
   STZ $2183
 
   LDX #$8008
@@ -177,11 +177,14 @@ _Loop09:
   STX $4302         ;Set source offset
   LDA #:wram_fill_byte
   STA $4304         ;Set source bank
-  LDX #$0000
+  
+  LDX #$FF00
   STX $4305         ;Set transfer size to 64k bytes
   LDA #$01
   STA $420B         ;Initiate transfer
-
+  
+  LDX #$0000
+  STX $4305
   LDA #$01          ;now set the next 64k bytes
   STA $420B         ;Initiate transfer
 
@@ -219,9 +222,9 @@ ClearVRAM:
    STX $4300         ;Set DMA mode to fixed source, WORD to $2118/9
    LDX #$0000
    STX $2116         ;Set VRAM port address to $0000
-   STX $0000         ;Set $00:0000 to $0000 (assumes scratchpad ram)
+   STX $0010         ;Set $00:0000 to $0000 (assumes scratchpad ram)
    STX $4302         ;Set source address to $xx:0000
-   LDA #$00
+   LDA #$10
    STA $4304         ;Set source bank to $00
    LDX #$FFFF
    STX $4305         ;Set transfer size to 64k-1 bytes
