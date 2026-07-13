@@ -66,6 +66,8 @@
 ;   in SNES  --> VRAM ($2116, $2117, $2118, $2119)
 ;   in data  --> 
 ;       tilemap holder (scratch value)
+; change this to use row and column of tile location
+; change it to just specify the palette number
 ;----------------------------------------------------------------------------
 .MACRO change_palette_in_tilemap 
     ;(16-bit A for this)

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title> LONG MUNCHER js prototype </title>
+        <style>
+            #game
+            {
+                top           : 50%;
+                left          : 50%;
+                transform     : translateX(-50%) translateY(-50%);
+                position      : fixed;
+            }
+        </style>
+    </head>
+
+    <body>
+        <canvas id = "game" width ="256" height = "224"></canvas>
+        <script>
+            const canvas = document.getElementById('game');
+            const ctx = canvas.getContext('2d');
+            let frame = 0;
+            let paused = false;
+            const stage_w = 16;
+            const stage_h = 14;
+            let locations = [];
+            let selfintersect = false;
+            let speed = 8;
+            let button_held = 0;
+
+            //for now rando
+            const target = 
+            {
+                x: Math.floor(Math.random() * stage_w), 
+                y: Math.floor(Math.random() * stage_h)
+            }
+
+            //start munchin'
+            const muncher = 
+            {
+                length: 1,
+                segments: [],
+                occupied: new Set()
+            }
+            
+            //somethin' with which to munch
+            muncher.segments.push(
+            {
+                x: stage_w/2 - 1,
+                y: stage_h/2 - 1,
+                direction: 'right'
+            });
+
+            //let the record show
+            locations.push(
+            {
+                x: muncher.segments[0].x,
+                y: muncher.segments[0].y
+            });
+
+            function update()
+            {   
+                if(!paused)
+                {  
+                    if(selfintersect)
+                    {
+                        //clear out arrays
+                        if(muncher.segments.length > 1)
+                        {
+                            if(speed != 2)
+                            {
+                                speed = 2;
+                            }
+                            muncher.segments.pop();
+                            locations.pop();
+                        }else 
+                        {
+                            speed = 8;
+                            selfintersect = false;
+                            muncher.occupied.clear();
+                        }
+                    }
+                    else
+                    {
+                        //console.log(`the muncher is ${muncher.segments.length}`);
+                        //console.log(`locations is: ${locations.length}`);
+
+                        //update the head based on current direction 
+                        if(muncher.segments[0].direction == 'right')
+                        {
+                            if(muncher.segments[0].x >= stage_w-1)
+                            {
+                                muncher.segments[0].x = 0;
+                            }else
+                            {
+                                muncher.segments[0].x += 1;
+                            }
+                        }
+
+                        if(muncher.segments[0].direction == 'left')
+                        {
+                            if(muncher.segments[0].x <= 0)
+                            {
+                                muncher.segments[0].x = stage_w-1;
+                            }else
+                            {
+                                muncher.segments[0].x -= 1;
+                            }
+                        }
+
+                        if(muncher.segments[0].direction == 'up')
+                        {
+                            if(muncher.segments[0].y <= 0)
+                            {
+                                muncher.segments[0].y = stage_h-1;
+                            }else
+                            {
+                                muncher.segments[0].y -= 1;
+                            }
+                        }
+
+                        if(muncher.segments[0].direction == 'down')
+                        {
+                            if(muncher.segments[0].y >= stage_h-1)
+                            {
+                                muncher.segments[0].y = 0;
+                            }else
+                            {
+                                muncher.segments[0].y += 1;
+                            }
+                        }
+                        
+                        //put new current location on top
+                        //(past location is now pushed down )
+                        locations.unshift(
+                        {
+                            x: muncher.segments[0].x,
+                            y: muncher.segments[0].y
+                        });
+
+                        //console.log(locations);
+                        
+                        //collision with target
+                        if (muncher.segments[0].x == target.x && muncher.segments[0].y == target.y)
+                        {
+                            //new target
+                            let grid = new Set();
+                            for(let x = 0; x < stage_w-1; x++)
+                            {
+                                for(let y = 0; y < stage_h-1; y++)
+                                {
+                                    grid.add(`${x},${y}`);
+                                }
+                            }
+
+                            for(const location of muncher.occupied)
+                            {
+                                if(grid.has(location))
+                                {
+                                    grid.delete(location);
+                                }
+                            }
+
+                            const unoccupied_spaces = [...grid];
+                            const rando_new_target = unoccupied_spaces[Math.floor(Math.random() * unoccupied_spaces.length -1)];
+                            const [new_target_x, new_target_y] = rando_new_target.split(",").map(Number);
+
+                            target.x = new_target_x;
+                            target.y = new_target_y;
+        
+                            //console.log(`muncher length is: ${muncher.segments.length}`)
+                            muncher.length += 1;
+
+                            muncher.segments.push( 
+                            {
+                                x: muncher.segments[muncher.segments.length - 1].x,
+                                y: muncher.segments[muncher.segments.length - 1].y,
+                                direction: muncher.segments[muncher.segments.length - 1].direction
+                            });
+                            
+                        }else
+                        {
+                            locations.pop();
+                        }
+
+                        if(muncher.occupied.has(`${muncher.segments[0].x},${muncher.segments[0].y}`))
+                        {
+                            selfintersect = true;
+                            speed = 2;
+                        }
+
+                        //put locations into muncher 
+                        muncher.occupied.clear();
+                        for(let i = 0; i < muncher.segments.length; i++)
+                        {
+                            muncher.segments[i].x = locations[i].x;
+                            muncher.segments[i].y = locations[i].y;
+                            muncher.occupied.add(`${muncher.segments[i].x},${muncher.segments[i].y}`);
+                        }
+                    }
+                }
+            }
+
+            function draw()
+            {
+                //redraw bg
+                if(!selfintersect)
+                {
+                    ctx.fillStyle = 'black';
+                }else
+                {
+                    ctx.fillStyle = 'red';
+                }
+
+                ctx.fillRect(0, 0, stage_w*16, stage_h*16);
+                
+                //redraw snake
+                ctx.fillStyle = 'cyan';
+                for(let i = muncher.segments.length-1; i >= 0; i--)
+                {   
+                    if(i != 0){ctx.fillStyle = 'blue';}else
+                    {
+                        ctx.fillStyle = 'cyan';
+                    }
+                    ctx.fillRect(muncher.segments[i].x*16, muncher.segments[i].y*16, 16, 16);
+                }
+
+                //redraw target
+                ctx.fillStyle = 'magenta';
+                ctx.fillRect(target.x*16, target.y*16, 16, 16);
+
+                if(paused)
+                {
+                    console.log("paused?");
+                    ctx.fillStyle = "#FF00FF99";
+                    ctx.fillRect(0, 0, stage_w*16, stage_h*16);
+                }
+            }
+
+            function loop()
+            {
+                if(frame % speed  == 0)
+                {
+                    update();
+                    draw();
+                }
+
+                //console.log(frame);
+                frame++;
+
+                requestAnimationFrame(loop);
+
+            }
+
+            //start
+            requestAnimationFrame(loop);
+
+            document.addEventListener('keyup', (e)=>
+            {
+                if(e.key == 'ArrowLeft' || e.key == 'ArrowRight' || e.key == 'ArrowUp' || e.key == 'ArrowDown')
+                {
+                    button_held = 0;
+                    speed = 8;
+                }
+            });
+            //events to change head direction
+            document.addEventListener('keydown', (e)=>
+            {
+                //console.log(e.key);
+
+                if(e.key == 'ArrowLeft' && muncher.segments[0].direction != 'right')
+                {
+                    muncher.segments[0].direction = 'left';
+                    button_held++;
+                }
+
+                if(e.key == 'ArrowRight' && muncher.segments[0].direction != 'left')
+                {
+                    muncher.segments[0].direction = 'right';
+                    button_held++;
+
+                }
+
+                if(e.key == 'ArrowUp' && muncher.segments[0].direction != 'down')
+                {
+                    muncher.segments[0].direction = 'up';
+                    button_held++;
+
+                }
+
+                if(e.key == 'ArrowDown' && muncher.segments[0].direction != 'up')
+                {
+                    muncher.segments[0].direction = 'down';
+                    button_held++;
+
+                }
+
+                if(e.key == ' ')
+                {
+                    paused = !paused;
+                }
+            });
+        </script>
+    </body>
+</html>
