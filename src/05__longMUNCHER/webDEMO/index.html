@@ -1,31 +1,42 @@
 <!DOCTYPE html>
 <html>
+    <!-- HEAD -->
+    <!-- ///////////////////////////////////// -->
     <head>
         <title> LONG MUNCHER js prototype </title>
+
+        <!-- CSS -->
         <style>
-            #game
-            {
-                top           : 50%;
-                left          : 50%;
-                transform     : translateX(-50%) translateY(-50%);
-                position      : fixed;
-            }
+        /* --------------------------------------------- */
+        #game
+        {
+            top           : 50%;
+            left          : 50%;
+            transform     : translateX(-50%) translateY(-50%);
+            position      : fixed;
+        }
+        /* --------------------------------------------- */
         </style>
     </head>
+    <!-- ///////////////////////////////////// -->
 
+    <!-- BOD -->
+    <!-- ///////////////////////////////////// -->
     <body>
         <canvas id = "game" width ="256" height = "224"></canvas>
+
+        <!-- ///////////////////////////////////// -->
         <script>
-            const canvas = document.getElementById('game');
-            const ctx = canvas.getContext('2d');
-            let frame = 0;
-            let paused = false;
-            const stage_w = 16;
-            const stage_h = 14;
-            let locations = [];
-            let selfintersect = false;
-            let speed = 8;
-            let button_held = 0;
+            const canvas        = document.getElementById('game');
+            const ctx           = canvas.getContext('2d');
+            let   frame         = 0;
+            let   paused        = false;
+            const stage_w       = 16;
+            const stage_h       = 14;
+            let   locations     = [];
+            let   selfintersect = false;
+            let   speed         = 8;
+            let   button_held   = 0;
 
             //for now rando
             const target = 
@@ -37,7 +48,7 @@
             //start munchin'
             const muncher = 
             {
-                length: 1,
+                length  : 1,
                 segments: [],
                 occupied: new Set()
             }
@@ -45,8 +56,8 @@
             //somethin' with which to munch
             muncher.segments.push(
             {
-                x: stage_w/2 - 1,
-                y: stage_h/2 - 1,
+                x        : stage_w/2 - 1,
+                y        : stage_h/2 - 1,
                 direction: 'right'
             });
 
@@ -57,10 +68,14 @@
                 y: muncher.segments[0].y
             });
 
+            //update all the positions and STUFF
+            //----------------------------------------------------->
             function update()
             {   
                 if(!paused)
                 {  
+                    //while we are waiting for next game
+                    //the muncher goes down to 1 again
                     if(selfintersect)
                     {
                         //clear out arrays
@@ -74,7 +89,7 @@
                             locations.pop();
                         }else 
                         {
-                            speed = 8;
+                            speed         = 8;
                             selfintersect = false;
                             muncher.occupied.clear();
                         }
@@ -142,7 +157,8 @@
                         //collision with target
                         if (muncher.segments[0].x == target.x && muncher.segments[0].y == target.y)
                         {
-                            //new target
+                            //new target 
+                            //big ass set of all locations
                             let grid = new Set();
                             for(let x = 0; x < stage_w-1; x++)
                             {
@@ -152,6 +168,7 @@
                                 }
                             }
 
+                            //remove occupied spaces (we are already tracking)
                             for(const location of muncher.occupied)
                             {
                                 if(grid.has(location))
@@ -160,10 +177,14 @@
                                 }
                             }
 
-                            const unoccupied_spaces = [...grid];
-                            const rando_new_target = unoccupied_spaces[Math.floor(Math.random() * unoccupied_spaces.length -1)];
+                            //conver to a 1D array
+                            const unoccupied_spaces            = [...grid];
+                            const rando_new_target             = unoccupied_spaces[Math.floor(Math.random() * unoccupied_spaces.length -1)];
+
+                            //pick a rando one
                             const [new_target_x, new_target_y] = rando_new_target.split(",").map(Number);
 
+                            //make new target
                             target.x = new_target_x;
                             target.y = new_target_y;
         
@@ -179,13 +200,15 @@
                             
                         }else
                         {
+                            //don't save last location if we ain't longer
                             locations.pop();
                         }
 
+                        //did we munch ourselves NOO O O O ooo o o O O !
                         if(muncher.occupied.has(`${muncher.segments[0].x},${muncher.segments[0].y}`))
                         {
                             selfintersect = true;
-                            speed = 2;
+                            speed         = 2;
                         }
 
                         //put locations into muncher 
@@ -199,10 +222,13 @@
                     }
                 }
             }
+            //----------------------------------------------------->
 
+            //draw everything
+            //----------------------------------------------------->
             function draw()
             {
-                //redraw bg
+                //redraw bg (red if we ded)
                 if(!selfintersect)
                 {
                     ctx.fillStyle = 'black';
@@ -213,8 +239,7 @@
 
                 ctx.fillRect(0, 0, stage_w*16, stage_h*16);
                 
-                //redraw snake
-                ctx.fillStyle = 'cyan';
+                //redraw snake, keep da head on top
                 for(let i = muncher.segments.length-1; i >= 0; i--)
                 {   
                     if(i != 0){ctx.fillStyle = 'blue';}else
@@ -228,14 +253,17 @@
                 ctx.fillStyle = 'magenta';
                 ctx.fillRect(target.x*16, target.y*16, 16, 16);
 
+                //lil overlay if we're paused
                 if(paused)
-                {
-                    console.log("paused?");
+                {                    
                     ctx.fillStyle = "#FF00FF99";
                     ctx.fillRect(0, 0, stage_w*16, stage_h*16);
                 }
             }
+            //----------------------------------------------------->
 
+            //recursive looo o o o o p
+            //----------------------------------------------------->
             function loop()
             {
                 if(frame % speed  == 0)
@@ -247,26 +275,41 @@
                 //console.log(frame);
                 frame++;
 
+                //recurrr r r r dat
                 requestAnimationFrame(loop);
-
             }
+            //----------------------------------------------------->
 
             //start
             requestAnimationFrame(loop);
 
+            //keyboard
+            //----------------------------------------------------->
+
+            /*
+            this was supposed to handle keyup
+            wanted to have it get faster on long press
+            felt kinda bad
+            */
             document.addEventListener('keyup', (e)=>
             {
                 if(e.key == 'ArrowLeft' || e.key == 'ArrowRight' || e.key == 'ArrowUp' || e.key == 'ArrowDown')
                 {
                     button_held = 0;
-                    speed = 8;
+                    speed       = 8;
                 }
             });
+
             //events to change head direction
             document.addEventListener('keydown', (e)=>
             {
                 //console.log(e.key);
 
+                /*
+                change directions, make sure we 
+                don't immediately eat ourselves by goin' 
+                backerds
+                */
                 if(e.key == 'ArrowLeft' && muncher.segments[0].direction != 'right')
                 {
                     muncher.segments[0].direction = 'left';
@@ -294,11 +337,14 @@
 
                 }
 
+                //POWZE
                 if(e.key == ' ')
                 {
                     paused = !paused;
                 }
             });
         </script>
+        <!-- ///////////////////////////////////// -->
+        <!-- END OF SCRIPT -->
     </body>
 </html>
