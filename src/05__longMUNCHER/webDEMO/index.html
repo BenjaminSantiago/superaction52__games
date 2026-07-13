@@ -37,6 +37,7 @@
             let   selfintersect = false;
             let   speed         = 8;
             let   button_held   = 0;
+            let prev_dir;
 
             //for now rando
             const target = 
@@ -60,6 +61,8 @@
                 y        : stage_h/2 - 1,
                 direction: 'right'
             });
+
+            prev_dir = muncher.segments[0].direction;
 
             //let the record show
             locations.push(
@@ -177,10 +180,11 @@
                                 }
                             }
 
-                            //conver to a 1D array
+                            //convert to a 1D array
                             const unoccupied_spaces            = [...grid];
-                            const rando_new_target             = unoccupied_spaces[Math.floor(Math.random() * unoccupied_spaces.length -1)];
+                            const rando_new_target             = unoccupied_spaces[Math.floor(Math.random() * unoccupied_spaces.length )];
 
+                            //console.log(rando_new_target);
                             //pick a rando one
                             const [new_target_x, new_target_y] = rando_new_target.split(",").map(Number);
 
@@ -219,6 +223,12 @@
                             muncher.segments[i].y = locations[i].y;
                             muncher.occupied.add(`${muncher.segments[i].x},${muncher.segments[i].y}`);
                         }
+
+                        /*
+                        track previous direction to prevent
+                        rapid mashing and "piano inputs"
+                        */
+                        prev_dir = muncher.segments[0].direction;
                     }
                 }
             }
@@ -286,20 +296,6 @@
             //keyboard
             //----------------------------------------------------->
 
-            /*
-            this was supposed to handle keyup
-            wanted to have it get faster on long press
-            felt kinda bad
-            */
-            document.addEventListener('keyup', (e)=>
-            {
-                if(e.key == 'ArrowLeft' || e.key == 'ArrowRight' || e.key == 'ArrowUp' || e.key == 'ArrowDown')
-                {
-                    button_held = 0;
-                    speed       = 8;
-                }
-            });
-
             //events to change head direction
             document.addEventListener('keydown', (e)=>
             {
@@ -310,31 +306,18 @@
                 don't immediately eat ourselves by goin' 
                 backerds
                 */
-                if(e.key == 'ArrowLeft' && muncher.segments[0].direction != 'right')
+                if(e.key == 'ArrowLeft' && prev_dir != 'right')
                 {
                     muncher.segments[0].direction = 'left';
-                    button_held++;
-                }
-
-                if(e.key == 'ArrowRight' && muncher.segments[0].direction != 'left')
+                }else if(e.key == 'ArrowRight' && prev_dir != 'left')
                 {
                     muncher.segments[0].direction = 'right';
-                    button_held++;
-
-                }
-
-                if(e.key == 'ArrowUp' && muncher.segments[0].direction != 'down')
+                }else if(e.key == 'ArrowUp' && prev_dir != 'down')
                 {
                     muncher.segments[0].direction = 'up';
-                    button_held++;
-
-                }
-
-                if(e.key == 'ArrowDown' && muncher.segments[0].direction != 'up')
+                }else if(e.key == 'ArrowDown' && prev_dir != 'up')
                 {
                     muncher.segments[0].direction = 'down';
-                    button_held++;
-
                 }
 
                 //POWZE
@@ -343,6 +326,7 @@
                     paused = !paused;
                 }
             });
+            //----------------------------------------------------->
         </script>
         <!-- ///////////////////////////////////// -->
         <!-- END OF SCRIPT -->

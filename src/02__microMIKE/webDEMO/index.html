@@ -1,0 +1,351 @@
+<!-- MICRO MIKE prototype in JS -->
+
+<!--
+quick prototype for Micro Mike
+mostly to test how robust the collisions
+with columns need to be
+-->
+<!DOCTYPE html>
+<html>
+    <!-- HEAD -->
+    <!-- ///////////////////////////////////// -->
+    <head>
+        <title> Micro Mike </title>
+
+        <!-- CSS -->
+        <style>
+        /* --------------------------------------------- */
+        #game
+        {
+            top           : 50%;
+            left          : 50%;
+            transform     : translateX(-50%) translateY(-50%);
+            position      : fixed;
+        }
+        /* --------------------------------------------- */
+        </style>
+    </head>
+    <!-- ///////////////////////////////////// -->
+
+    <!-- BOD -->
+    <!-- ///////////////////////////////////// -->
+    <body>
+        <canvas id = "game" width ="256" height = "224"></canvas>
+
+        <!-- ///////////////////////////////////// -->
+        <script>
+            const canvas             = document.getElementById('game');
+            const ctx                = canvas.getContext('2d');
+            
+            const stage_w            = 16;
+            const stage_h            = 14;
+            let   bg_color           = "#000000";
+            
+            //this is frame counter if we need (we use it in snake)
+            let   frame              = 0;
+            //this is the actual frame delay value
+            let   speed              = 1;
+
+            let   paused             = false;
+            
+            //move the columns
+            let   h_scroll           = 1;
+
+            //if we die, or are starting
+            //don't auto fall
+            let   waiting            = true;
+
+            //after we die wait for visual feedback
+            let   death_wait_counter = 0;
+            const death_wait_time    = 40;
+
+            //how big the squares/rects
+            const sprite_size        = 16;
+
+            //space between obstacle columns
+            const opening            = sprite_size * 4;
+            const column_width       = 64;
+
+            /*
+            ARE WE OVERLAPPINnnnNNN?
+            quickly check if 2 rectangles overlap
+            
+            assumes two things have x, y, w, and h
+
+            returns a boolean n nn 
+            */
+            function overlapping(object_a, object_b)
+            {
+                if(
+                object_a.x + object_a.w >= object_b.x &&
+                object_a.x <= object_b.x + object_b.w &&
+                object_a.y + object_a.h >= object_b.y &&
+                object_a.y <= object_b.y + object_b.h
+                )
+                {
+                    return true;
+                }else
+                {
+                    return false;
+                }
+            }
+
+            //when we get to the edge or are starting
+            function new_random_column_opening()
+            {
+                const location_sprite = Math.floor(Math.random() * (stage_h - 3));
+                return location_sprite * sprite_size;
+            }
+
+            //obstacle columns (2 top + bottom)
+            const obstacle_top =
+            {
+                x: stage_w *16 + column_width,
+                y: 0,
+                w: column_width,
+                h: new_random_column_opening(),
+                reset()
+                {
+                    obstacle_top.x    = stage_w*16 + column_width;
+                    obstacle_bottom.x = stage_w*16 + column_width;
+
+                    obstacle_top.h    = new_random_column_opening();
+                    obstacle_bottom.y = obstacle_top.h + opening;
+                    obstacle_bottom.h = stage_h*16 - (obstacle_top.h + opening);
+                }
+            }
+
+            const obstacle_bottom = 
+            {
+                x: obstacle_top.x,
+                y: obstacle_top.h + opening,
+                w: column_width,
+                h: stage_h*16 - (obstacle_top.h + opening)                    
+            }
+
+            const obstacle2_top =
+            {
+                x: obstacle_top.x + column_width * 3,
+                y: 0,
+                w: column_width,
+                h: new_random_column_opening(),
+                reset()
+                {
+                    obstacle2_top.x    = stage_w*16 + column_width;
+                    obstacle2_bottom.x = stage_w*16 + column_width;
+
+                    obstacle2_top.h    = new_random_column_opening();
+                    obstacle2_bottom.y = obstacle2_top.h + opening;
+                    obstacle2_bottom.h = stage_h*16 - (obstacle2_top.h + opening);
+                },
+                reset_trailing()
+                {
+                    obstacle2_top.x    = obstacle_top.x + column_width * 3
+                    obstacle2_bottom.x = obstacle2_top.x ;
+
+                    obstacle2_top.h    = new_random_column_opening();
+                    obstacle2_bottom.y = obstacle2_top.h + opening;
+                    obstacle2_bottom.h = stage_h*16 - (obstacle2_top.h + opening);
+                }
+
+            }
+
+            const obstacle2_bottom = 
+            {
+                x: obstacle2_top.x,
+                y: obstacle2_top.h + opening,
+                w: column_width,
+                h: stage_h*16 - (obstacle2_top.h + opening)
+            }
+
+            //MIKEY EY EY EYEYY Y Y YY Y Y!
+            const mike = 
+            {
+                dead: false,
+                speed_x: 0,
+                speed_y: 0,
+                accel_x: 0,
+                accel_y: .3,
+                x      : (stage_w * 16)/2 - 32,
+                y      : (stage_h * 16)/2 - 32,
+                w      : 16,
+                h      : 16
+            }
+
+            //values to reset when he die
+            function mikey_died()
+            {
+                mike.y       = (stage_h * 16)/2 - 32;
+                mike.speed_y = 0;
+                waiting      = true;
+                obstacle_top.reset();
+                obstacle2_top.reset_trailing();
+            }
+            
+            //update all the positions and STUFF
+            //----------------------------------------------------->
+            function update()
+            {
+                //uh oh dead....
+                /*
+                change bg color wait for a little bit
+                manage counter
+                */   
+                if(mike.dead)
+                {
+                    if(bg_color == "#000000")
+                    {
+                        bg_color = "#FF0000";
+                    }
+                    
+                    if(death_wait_counter == death_wait_time)
+                    {
+                        death_wait_counter = 0;
+                        mike.dead          = false;
+                        bg_color           = "#000000";
+                        mikey_died();
+                    }else
+                    {
+                        death_wait_counter++;
+                    }
+                }else
+                {
+                    if(!paused)
+                    {           
+                        //falling + scrolling
+                        if(!waiting)
+                        {
+                            mike.speed_y += mike.accel_y;
+                            mike.y       += mike.speed_y;           
+
+                            obstacle_top.x     -= h_scroll;
+                            obstacle_bottom.x  -= h_scroll;
+                            obstacle2_top.x    -= h_scroll;
+                            obstacle2_bottom.x -= h_scroll;
+                        }   
+
+                        //put back the columns
+                        if(obstacle_top.x + obstacle_top.w <= 0)
+                        {
+                            obstacle_top.reset();
+                        }
+
+                        if(obstacle2_top.x + obstacle2_top.w <= 0)
+                        {
+                            obstacle2_top.reset();
+                        }
+
+                        //check floor and ceiling
+                        if(mike.y > stage_h * 16)
+                        {
+                            mike.dead = true;
+                        }
+                        
+                        //clamp for ceiling
+                        if(mike.y <= 0)
+                        {
+                            mike.y       = 0;
+                            mike.speed_y = 0;
+                        }
+
+                        //check obstacles
+                        if(
+                            overlapping(mike, obstacle_top) ||
+                            overlapping(mike, obstacle_bottom) ||
+                            overlapping(mike, obstacle2_top) ||
+                            overlapping(mike, obstacle2_bottom)
+                            )
+                        {
+                            mike.dead = true;
+                        }
+                    }
+                }
+            }
+            //----------------------------------------------------->
+
+            //draw everything
+            //----------------------------------------------------->
+            function draw()
+            {
+                //redraw bg
+                ctx.fillStyle = bg_color;                
+                ctx.fillRect(0, 0, stage_w*16, stage_h*16);
+                
+                ctx.fillStyle = '#FF00FF';
+                ctx.fillRect(mike.x, mike.y, mike.w, mike.h);
+
+                ctx.fillStyle = "#00FFFF";
+                ctx.fillRect(obstacle_top.x, obstacle_top.y, obstacle_top.w, obstacle_top.h);
+                ctx.fillRect(obstacle_bottom.x, obstacle_bottom.y, obstacle_bottom.w, obstacle_bottom.h);
+
+                ctx.fillStyle = "#FFFF00";
+                ctx.fillRect(obstacle2_top.x, obstacle2_top.y, obstacle2_top.w, obstacle2_top.h);
+                ctx.fillRect(obstacle2_bottom.x, obstacle2_bottom.y, obstacle2_bottom.w, obstacle2_bottom.h);
+
+                //lil overlay if we're paused
+                if(paused)
+                {                    
+                    ctx.fillStyle = "#FF00FF99";
+                    ctx.fillRect(0, 0, stage_w*16, stage_h*16);
+                }
+            }
+            //----------------------------------------------------->
+
+            //recursive looo o o o o p
+            //----------------------------------------------------->
+            function loop()
+            {
+                if(frame % speed  == 0)
+                {
+                    update();
+                    draw();
+                }
+
+                //console.log(frame);
+                frame++;
+
+                //recurrr r r r dat
+                requestAnimationFrame(loop);
+            }
+            //----------------------------------------------------->
+
+            //start
+            requestAnimationFrame(loop);
+
+            //keyboard
+            //----------------------------------------------------->
+
+            /*
+            this was supposed to handle keyup
+            wanted to have it get faster on long press
+            felt kinda bad
+            */
+            document.addEventListener('keyup', (e)=>
+            {
+
+            });
+
+            //events to change head direction
+            document.addEventListener('keydown', (e)=>
+            {
+                //console.log(e.key);
+                if(e.key == 'a' || e.key == 'A')
+                {
+                    if(waiting)
+                    {
+                        waiting = !waiting;
+                    }
+                    mike.speed_y = -4;
+                }
+
+                //POWZE
+                if(e.key == ' ')
+                {
+                    paused = !paused;
+                }
+            });
+        </script>
+        <!-- ///////////////////////////////////// -->
+        <!-- END OF SCRIPT -->
+    </body>
+</html>

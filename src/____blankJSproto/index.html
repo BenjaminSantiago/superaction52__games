@@ -37,6 +37,29 @@
             let   paused        = false;
             let   speed         = 8;
 
+            /*
+            quickly check overlap
+            
+            assumes two things have x, y, w, and h
+
+            returns a boolean n nn 
+            */
+            function overlapping(object_a, object_b)
+            {
+                if(
+                object_a.x + object_a.w >= object_b.x &&
+                object_a.x <= object_b.x + object_b.w &&
+                object_a.y + object_a.h >= object_b.y &&
+                object_a.y <= object_b.y + object_b.h
+                )
+                {
+                    return true;
+                }else
+                {
+                    return false;
+                }
+            }
+
             //update all the positions and STUFF
             //----------------------------------------------------->
             function update()
