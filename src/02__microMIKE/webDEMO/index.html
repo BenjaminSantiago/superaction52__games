@@ -271,13 +271,16 @@ with columns need to be
                 ctx.fillStyle = bg_color;                
                 ctx.fillRect(0, 0, stage_w*16, stage_h*16);
                 
+                //draw mikey
                 ctx.fillStyle = '#FF00FF';
                 ctx.fillRect(mike.x, mike.y, mike.w, mike.h);
 
+                //drawbstcle 1
                 ctx.fillStyle = "#00FFFF";
                 ctx.fillRect(obstacle_top.x, obstacle_top.y, obstacle_top.w, obstacle_top.h);
                 ctx.fillRect(obstacle_bottom.x, obstacle_bottom.y, obstacle_bottom.w, obstacle_bottom.h);
 
+                //drawbstcle 2
                 ctx.fillStyle = "#FFFF00";
                 ctx.fillRect(obstacle2_top.x, obstacle2_top.y, obstacle2_top.w, obstacle2_top.h);
                 ctx.fillRect(obstacle2_bottom.x, obstacle2_bottom.y, obstacle2_bottom.w, obstacle2_bottom.h);
@@ -329,7 +332,7 @@ with columns need to be
             document.addEventListener('keydown', (e)=>
             {
                 //console.log(e.key);
-                if(e.key == 'a' || e.key == 'A')
+                if((e.key == 'a' || e.key == 'A') && e.repeat == false)
                 {
                     if(waiting)
                     {

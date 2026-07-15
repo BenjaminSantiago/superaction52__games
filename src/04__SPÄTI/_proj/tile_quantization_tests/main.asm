@@ -15,10 +15,6 @@
 
 ;variables
 ;---------------------------------------------------------------
-.ASCIITABLE
-    MAP "A" TO "Z" = $00
-.ENDA
-
 ;game modes
 .EQU gameMODE $0221
 .EQU is_GAME_paused $0222
@@ -108,10 +104,10 @@ Start:
    
     ; Load Palettes & Graphics
     ;---------------------------------
-    LoadPalette Alphabet__01_palette, 0,   16
+    LoadPalette Spati__title_palette, 0,   16
 
     ; HOW TO MAKE SURE THESE NUMBERS ARE ACCURATE?
-    LoadBlockToVRAM Alphabet__01_graphic, $0000, $1000
+    LoadBlockToVRAM Spati__title_tiles, $0000, $2000
     ;---------------------------------
 
     lda $0002
@@ -147,23 +143,31 @@ Start:
     ;get x 
     ldx #$0000
 
-    ; add the message
 loop_for_bg:
-    lda.l howl, x
+    lda.l Spati__title_map, x
     sta $2118   ;put tile number into VRAM low
     inx
     inx
-    cpx #howl_end-howl
+    cpx #$0E00
     bne loop_for_bg
 
-    ; make the rest of the screen blank (00 would be A)
-loop_for_empty:
-    lda #$0454
-    sta $2118
-    inx
-    inx
-    cpx #$0E00
-    bne loop_for_empty
+    ; add the message
+;loop_for_bg:
+;    lda.l howl, x
+;    sta $2118   ;put tile number into VRAM low
+;    inx
+;    inx
+;    cpx #howl_end-howl
+;    bne loop_for_bg
+;
+;    ; make the rest of the screen blank (00 would be A)
+;loop_for_empty:
+;    lda #$0454
+;    sta $2118
+;    inx
+;    inx
+;    cpx #$0E00
+;    bne loop_for_empty
 
     rep #$10
     sep #$20
@@ -516,6 +520,13 @@ Alphabet__01_palette:
     .INCBIN "_graphics/Alphabet__01_strip.clr"
 Alphabet__01_graphic:
     .INCBIN "_graphics/Alphabet__01_strip.pic"
+
+Spati__title_palette:
+    .INCBIN "_graphics/SPATItitle__palette.clr"
+Spati__title_tiles:
+    .INCBIN "_graphics/SPATItitle__tiles.pic"
+Spati__title_map:
+    .INCBIN "_graphics/SPATItitle__tilemap.map"
 
     .INC "inc/howl.inc"
 ;---------------------------------------------------------------
