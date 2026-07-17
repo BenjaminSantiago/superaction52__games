@@ -15,7 +15,19 @@
 
 ;variables
 ;---------------------------------------------------------------
-;game modes
+; GAME MODE
+;---------------
+; use bits 0 and 1 in order to indicate
+; 00 --> init
+; 01 --> fading in
+; 10 --> fading out
+; 11 --> loading vram data
+
+;then upper 6 bits are an index to a game mode 
+;right now:
+;000000 --> title
+;000001 --> first image
+
 .EQU gameMODE $0221
 .EQU is_GAME_paused $0222
 
@@ -43,6 +55,31 @@
 
 .EQU SCREEN__brightness $022F
 
+; this is SCRATCH for holding
+; which numbered chunk of 
+; vram we are uploading to
+.EQU vram_chunk $0230
+
+
+; this is for making the palette fade to white
+;-------------------------------
+; which number in the palette $00 - $10 (16 entries)
+.EQU palette_index $0231
+
+; the offset of the word of the palette entry
+.EQU palette_offset $0232 ; <-- a word (2 bytes)
+
+; which direction we want to fade 
+; 0 --> increase
+; 1 --> decrease
+.EQU palette_fade_direction $0234 ;<--FLAG
+
+; I think we need 3 bytes for this
+; this is the location where the color values are coming from 
+.EQU palette_table_pointer $00 ;<-- direct page for Y
+.EQU palette_target_gameMODE $235
+;-------------------------------
+
 ;---------------------------------------------------------------
 
 ;where the processor goes on reset
@@ -67,7 +104,7 @@ Start:
     cmp #%01010101
     beq @secret_pass
 
-    bra @init
+    bra @init  
 
 @secret_pass:
     lda #%11110000
@@ -78,11 +115,11 @@ Start:
     InitSNES   
 
     
-    lda #%10101010
-    sta $0000
-
-    lda #%01010101
-    sta $0001
+    ;lda #%10101010
+    ;sta $0000
+    ;
+    ;lda #%01010101
+    ;sta $0001
     
     ;"initialize" the "variables"
     ;---------------------------------
@@ -91,7 +128,13 @@ Start:
 
     stz SCREEN__brightness
 
-
+    stz vram_chunk
+    stz palette_index
+    stz palette_offset
+    stz palette_offset+1
+    stz palette_fade_direction
+    stz palette_table_pointer
+    stz palette_target_gameMODE
     ;---------------------------------
 
     ;A/X/Y width (XY 16-bit & A 8-bit)   
@@ -104,73 +147,47 @@ Start:
    
     ; Load Palettes & Graphics
     ;---------------------------------
-    LoadPalette Spati__title_palette, 0,   16
+    LoadPalette Spati__title_palette,   0,  16
+    
+    ; (I have some garbage getting passed to the bg layers
+    ; not sure why it is happening so for now, 
+    ; making all the other background palettes white)
+    LoadPalette all_white_palette, 16, 16
+    LoadPalette all_white_palette, 32, 16
+    LoadPalette all_white_palette, 48, 16
+    LoadPalette all_white_palette, 64, 16
+    LoadPalette all_white_palette, 80, 16
+    LoadPalette all_white_palette, 96, 16
+    LoadPalette all_white_palette, 112, 16
+    LoadPalette all_white_palette, 128, 16
+    LoadPalette all_white_palette, 144, 16
 
     ; HOW TO MAKE SURE THESE NUMBERS ARE ACCURATE?
-    LoadBlockToVRAM Spati__title_tiles, $0000, $2000
+    LoadBlockToVRAM Spati__title_tiles, $0000, $0B00
+    LoadBlockToVRAM Spati__title_map,   $0800, $0700
     ;---------------------------------
 
-    lda $0002
-    cmp #$F0
-    bne @no_secret
+    ;pass tilemap location
+    lda #$08
+    sta $2107
 
-    lda #$00
-    sta $2121
-
-    lda #$1F
-    sta $2122
-
-    lda #$00
-    sta $2122
-@no_secret:
-    ;tilemap
-    ;---------------------------------
-    ; set to increment when writing to $2118
-    lda #%10000000     
-    sta $2115
-
-    lda #$70            ; Set BG1's Tile Map offset
-    sta $2107           ; And the Tile Map size to 32x32
-
-    rep #$30
-
-    ; set the starting address for the tilemap
-    ; (it must be at $7000 because that is the end 
-    ; of where we are storing the character data)
-    ldx #$7000
-    stx $2116
-
-    ;get x 
-    ldx #$0000
-
-loop_for_bg:
-    lda.l Spati__title_map, x
-    sta $2118   ;put tile number into VRAM low
-    inx
-    inx
-    cpx #$0E00
-    bne loop_for_bg
-
-    ; add the message
-;loop_for_bg:
-;    lda.l howl, x
-;    sta $2118   ;put tile number into VRAM low
-;    inx
-;    inx
-;    cpx #howl_end-howl
-;    bne loop_for_bg
+    ; check direct page on reset
+    ;;---------------------------------
+    ;lda $0002
+    ;cmp #$F0
+    ;bne @no_secret
 ;
-;    ; make the rest of the screen blank (00 would be A)
-;loop_for_empty:
-;    lda #$0454
-;    sta $2118
-;    inx
-;    inx
-;    cpx #$0E00
-;    bne loop_for_empty
+    ;lda #$00
+    ;sta $2121
+;
+    ;lda #$1F
+    ;sta $2122
+;
+    ;lda #$00
+    ;sta $2122
+    ;;---------------------------------  
+;@no_secret:
 
-    rep #$10
-    sep #$20
     ;(sprites don't matter yet)
     ;---------------------------------
     ;put RAM "copy" of sprites offscreen
@@ -206,6 +223,41 @@ pause:
 @not_paused:
     ;-------------------------
 
+check_controls:
+    lda gameMODE
+    bne go_to_game@done_with_controls
+
+    ;from the title screen, 
+    ;wait for P1 to press any
+    ;non-directional button press
+    lda joy1H__p
+    and #%11110000
+    bne go_to_game
+
+    lda joy1L__p
+    and #%11110000
+    bne go_to_game
+
+    bra go_to_game@done_with_controls
+
+go_to_game:
+    ;set game mode to 
+    ;000000 --> title
+    ;10     --> fading out
+    lda #%00000010
+    sta gameMODE
+@done_with_controls:
+
+main_game:
+    lda gameMODE
+    cmp #$01
+    beq @first_bg    
+
+    jmp @done_with_main_game
+
+@first_bg:
+
+@done_with_main_game:
     jmp forever    ;<-- we outttttt t t t t t t t
 ;---------------------------------------------------------------
 
@@ -366,7 +418,6 @@ VBlank:
     
     rep #$10    
     sep #$20
-
     ;-----------------------------------------
     
     
@@ -496,18 +547,255 @@ VBlank:
 @done_with_pause:
     ;--------------------------------
 
+
+    ; CHECK GAME MODE
+    ;-------------------------------------------------
+check_the_gameMODE:
+    ;000000 --> title 
+    ;10     --> fade out
+    lda gameMODE
+    cmp #%00000010
+    bne +
+    jmp title__fadeOUT
++
+    ;000001 --> screen 1 
+    ;11     --> load VRAM
+    lda gameMODE
+    cmp #%000000111
+    beq screen01@loadVRAM
+
+    ;000001 --> screen 1
+    ;00     --> init
+    lda gameMODE
+    cmp #%00000100
+    bne +
+    jmp screen01@init
+
++    
+    ;000001 --> screen 1
+    ;01     --> fade in
+    lda gameMODE
+    cmp #%00000101
+    bne +
+    jmp screen01@fade_in
++
+
+    ;000010 --> screen 1 + text
+    ;00     --> init
+    lda gameMODE
+    cmp #%00001000
+    bne +
+
+    jmp screen01_text@init
+
++
+    jmp end_interrupt
+
+    ; TITLE --> fade out
+    ;--------------------------------
+title__fadeOUT:   
+    ; initialize values we need
+
+    ; index in the palette
+    lda #$00
+    sta palette_index
+
+    ; the offset of table value
+    ldy palette_offset
+
+    ; zero is out 
+    stz palette_fade_direction
+
+    ; get pointer values
+    lda #<title__DIPtoWHITE@begin
+    sta palette_table_pointer
+
+    lda #>title__DIPtoWHITE@begin
+    sta palette_table_pointer+1
+
+    lda #:title__DIPtoWHITE@begin
+    sta palette_table_pointer+2
+
+    ; game mode we target afterwards
+    lda #%00000111
+    sta palette_target_gameMODE
+    jmp palette_loop
+
+    ; load BG1 in chunks
+    ; (THIS NEEDS TO BE GENERIC)
+    ;--------------------------------
+screen01:
+@loadVRAM:    
+    lda vram_chunk
+    beq @loadVRAM__chunk00
+
+    lda vram_chunk
+    cmp #$01
+    beq @loadVRAM__chunk01
+
+    lda vram_chunk
+    cmp #$02
+    beq @loadVRAM__chunk02
+
+    lda vram_chunk
+    cmp #$03
+    beq @loadVRAM__chunk03
+
+    jmp @loadMAP
+
+@loadVRAM__chunk00:
+    LoadBlockToVRAM FIELDclosed__tiles,     $0000, $0800
+    inc vram_chunk
+    jmp @done_with_VRAMchunks
+
+@loadVRAM__chunk01:
+    LoadBlockToVRAM FIELDclosed__tiles+$0800, $0400, $0800
+    inc vram_chunk
+    jmp @done_with_VRAMchunks
+
+@loadVRAM__chunk02:
+    LoadBlockToVRAM FIELDclosed__tiles+$1000, $0800, $0800
+    inc vram_chunk
+    jmp @done_with_VRAMchunks
+
+@loadVRAM__chunk03:
+    LoadBlockToVRAM FIELDclosed__tiles+$1800, $0C00, $0120
+    inc vram_chunk
+    jmp @done_with_VRAMchunks
+
+@loadMAP:
+    LoadBlockToVRAM FIELDclosed__map, $1400, $0700
+        
+    ; link tilemap
+    lda #$14
+    sta $2107
+
+    ;000001 --> screen 01
+    ;00     --> init
+    lda #%00000100
+    sta gameMODE
+@done_with_VRAMchunks:
+    jmp end_interrupt
+    ;--------------------------------
+
+@init:
+    ;max out palette init
+    ldy #$01E0
+    sty palette_offset
+    
+    ;going up the table
+    lda #$01
+    sta palette_fade_direction
+
+    ;point 'em up
+    lda #<FIELDclosed__toWHITE__begin
+    sta palette_table_pointer
+
+    lda #>FIELDclosed__toWHITE__begin
+    sta palette_table_pointer+1
+
+    lda #:FIELDclosed__toWHITE__begin
+    sta palette_table_pointer+2
+    
+    lda #%00001000
+    sta palette_target_gameMODE
+
+    ; we are done with in it, 
+    ; advance game mode
+    ;screen 01, fade in
+    lda #%00000101
+    sta gameMODE
+@fade_in:
+    lda #$00
+    sta palette_index
+
+    ldy palette_offset
+
+    ; this should be a subroutine.
+palette_loop:
+    lda palette_index
+    sta $2121
+
+    ;put color
+    lda [palette_table_pointer], y
+    sta $2122
+    iny
+
+    lda [palette_table_pointer], y
+    sta $2122
+    iny
+
+    inc palette_index
+    lda palette_index
+    cmp #$10
+    bne palette_loop
+
+    lda palette_fade_direction
+    beq @up
+@down: 
+    rep #$20
+    lda palette_offset
+    beq @down_done
+
+    sec 
+    sbc #$0020
+    sta palette_offset
+    sep #$20
+    bra @done
+
+@down_done: 
+    sep #$20
+    lda palette_target_gameMODE
+    sta gameMODE
+    bra @done
+
+@up:
+    sty palette_offset
+    cpy #$0200
+    bne end_interrupt
+
+    lda palette_target_gameMODE
+    sta gameMODE
+@done:
     ;-----------------------------------------
-@end_interrupt:
+
+screen01_text:
+@init:
+    ;turn on other bg
+    lda #%00000011
+    sta $212C
+    ; BG1 character base = $0000, BG2 character base = $2000.
+    lda #$20
+    sta $210B
+
+    LoadBlockToVRAM Alphabet__01_graphic, $2000, $0C00
+    
+    ;LoadPalette Alphabet__01_palette, 16, 16
+    LoadBlockToVRAM howl, $2800, howl_end-howl
+    lda #$28
+    sta $2108
+
+
+
+
+
+
+
+end_interrupt:
+    rep #$10
+    sep #$20
     ply
     plx
     pla
     plp
 
-    rep #$10
-    sep #$20
-
     rti
 
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+    .INC "inc/FIELDclosed__toWHITE.inc"
+    .INC "inc/title__DIPtoWHITE.inc"
 ;---------------------------------------------------------------
 .ENDS
 
@@ -516,10 +804,13 @@ VBlank:
 .BANK 1 SLOT 0
 .ORG 0
 .SECTION "graphic_and_audio__includes"
+
 Alphabet__01_palette:
     .INCBIN "_graphics/Alphabet__01_strip.clr"
 Alphabet__01_graphic:
     .INCBIN "_graphics/Alphabet__01_strip.pic"
+    
+    .INC "inc/howl.inc"
 
 Spati__title_palette:
     .INCBIN "_graphics/SPATItitle__palette.clr"
@@ -528,6 +819,13 @@ Spati__title_tiles:
 Spati__title_map:
     .INCBIN "_graphics/SPATItitle__tilemap.map"
 
-    .INC "inc/howl.inc"
+FIELDclosed__palette:
+    .INCBIN "_graphics/FIELDclosed__86.clr"
+FIELDclosed__map:
+    .INCBIN "_graphics/FIELDclosed__86.map"
+FIELDclosed__tiles:
+    .INCBIN "_graphics/FIELDclosed__86.pic"
+
+
 ;---------------------------------------------------------------
 .ENDS
