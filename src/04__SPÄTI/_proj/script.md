@@ -2,7 +2,7 @@ title graphic
 (wait for any button)
 2026 Benjamin Santiago
 
-(bg 1) I used to take walks around sometimes as late as 3AM.
+(bg 1) I used to take walks, sometimes as late as 3:00AM.
 
 (bg 2) Really long walks, trying to see how far I could go.
 

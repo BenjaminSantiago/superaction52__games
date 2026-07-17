@@ -80,6 +80,8 @@
 .EQU palette_target_gameMODE $235
 ;-------------------------------
 
+.EQU max_map $236 ;<-- WORD
+.EQU map_index $238 
 ;---------------------------------------------------------------
 
 ;where the processor goes on reset
@@ -135,6 +137,7 @@ Start:
     stz palette_fade_direction
     stz palette_table_pointer
     stz palette_target_gameMODE
+    stz max_map
     ;---------------------------------
 
     ;A/X/Y width (XY 16-bit & A 8-bit)   
@@ -588,6 +591,15 @@ check_the_gameMODE:
 
     jmp screen01_text@init
 
++   
+    ;000010 --> screen 1 + text
+    ;01     --> show text "fade in"         
+    lda gameMODE
+    cmp #%00001001
+    bne +
+
+    jmp screen01_text@show_text
+
 +
     jmp end_interrupt
 
@@ -752,34 +764,77 @@ palette_loop:
 @up:
     sty palette_offset
     cpy #$0200
-    bne end_interrupt
+    bne +
 
     lda palette_target_gameMODE
-    sta gameMODE
+    sta gameMODE   
+    bra @done
++
+    jmp end_interrupt
+
 @done:
     ;-----------------------------------------
+    jmp end_interrupt
 
 screen01_text:
 @init:
+    lda #%00001001
+    sta gameMODE
+
     ;turn on other bg
     lda #%00000011
     sta $212C
-    ; BG1 character base = $0000, BG2 character base = $2000.
+
+    ; BG1 character base = $0000, 
+    ; BG2 character base = $2000.
     lda #$20
     sta $210B
 
+    ; upload alphabet
     LoadBlockToVRAM Alphabet__01_graphic, $2000, $0C00
-    
-    ;LoadPalette Alphabet__01_palette, 16, 16
-    LoadBlockToVRAM howl, $2800, howl_end-howl
+   
+    ; load a blank tilemap
+    LoadBlockToVRAM blank_tilemap, $2800, blank_tilemap@end-blank_tilemap@begin
     lda #$28
     sta $2108
 
+    ;ldx screen01_text_map@message_begin
+    ldy #($2800 + ((screen01_text_map@message_begin - screen01_text_map@begin) / 2))
+    sty max_map
 
+    ldx #$0000
+    stx map_index
 
+    ; fall through to one pass of showing text
+@show_text: 
+    ldx map_index 
 
+    lda #$80
+    sta $2115
 
+    ldy max_map
+    sty $2116
 
+    ;make this a pointer!
+    lda.l screen01_text_map@message_begin, x
+    sta $2118
+
+    lda.l screen01_text_map@message_begin+1, x
+    sta $2119
+
+    iny 
+    sty max_map
+
+    inx 
+    inx 
+    stx map_index
+    
+    ldy max_map
+    cpy #$2C00
+    bne end_interrupt
+
+    lda #%10101010
+    sta gameMODE
 
 end_interrupt:
     rep #$10
@@ -806,11 +861,13 @@ end_interrupt:
 .SECTION "graphic_and_audio__includes"
 
 Alphabet__01_palette:
-    .INCBIN "_graphics/Alphabet__01_strip.clr"
+    .INCBIN "_graphics/Alphabet__01__v02_strip.clr"
 Alphabet__01_graphic:
-    .INCBIN "_graphics/Alphabet__01_strip.pic"
+    .INCBIN "_graphics/Alphabet__01__v02_strip.pic"
     
+    .INC "inc/blank_tilemap.inc"
     .INC "inc/howl.inc"
+    .INC "inc/screen01__text.inc"
 
 Spati__title_palette:
     .INCBIN "_graphics/SPATItitle__palette.clr"
