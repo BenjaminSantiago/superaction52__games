@@ -74,10 +74,16 @@
 ; 1 --> decrease
 .EQU palette_fade_direction $0234 ;<--FLAG
 
-; I think we need 3 bytes for this
 ; this is the location where the color values are coming from 
-.EQU palette_table_pointer $00 ;<-- direct page for Y
+.EQU palette_table_pointer $00 ;<-- 00, 01, 02 direct page for Y
 .EQU palette_target_gameMODE $235
+;-------------------------------
+
+; this is for making the text appear
+;-------------------------------
+.EQU text_show__address     $0236
+.EQU text_show__char_index  $0238
+.EQU text_show__pointer     $03
 ;-------------------------------
 
 .EQU max_map $236 ;<-- WORD
@@ -409,7 +415,119 @@ CHECK__pause:
     lda is_GAME_paused 
     rts
 ;---------------------------------------------------------------
+    
+; PALETTE LOOP
+; fade out to white OR
+; fade in from white
+; expects     
+;   * palette_index --> one byte
+;        counter for which palette entry (0 - 15)
+;    * palette_offset --> word (2 bytes)
+;        address of palette value
+;    * palette_fade_direction --> bit flag  
+;        determine flow for fading in or out
+;    * palette_table_pointer --> 24bits (3 bytes) in direct page
+;        actual address we want to give the routine
+;    * palette_target_gameMODE --> one byte
+;        where we want the game to go after 
+;        the routine finishes looping
+;---------------------------------------------------------------
+palette_loop__routine:
+@begin:
+    lda palette_index
+    sta $2121
 
+    ;put color
+    lda [palette_table_pointer], y
+    sta $2122
+    iny
+
+    lda [palette_table_pointer], y
+    sta $2122
+    iny
+
+    inc palette_index
+    lda palette_index
+    cmp #$10
+    bne @begin
+
+    lda palette_fade_direction
+    beq @up
+@down: 
+    rep #$20
+    lda palette_offset
+    beq @down_done
+
+    sec 
+    sbc #$0020
+    sta palette_offset
+    sep #$20
+    bra @done
+
+@down_done: 
+    sep #$20
+    lda palette_target_gameMODE
+    sta gameMODE
+    bra @done
+
+@up:
+    sty palette_offset
+    cpy #$0200
+    bne @done
+
+    lda palette_target_gameMODE
+    sta gameMODE   
+
+@done:
+    rts
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------    
+show_text__routine:   
+    ldy text_show__char_index
+
+    lda #$80
+    sta $2115
+
+    ldx text_show__address
+    stx $2116
+
+    ;make this a pointer!
+    lda [text_show__pointer], y
+    sta $2118
+    iny 
+
+    lda [text_show__pointer], y
+    sta $2119
+    iny
+
+    ; show asterisk only if we are at
+    ; a non-space character
+    lda [text_show__pointer], y
+    cmp #$54
+    beq +
+
+    lda #$49
+    sta $2118
+
+    lda #$24
+    sta $2119
++
+
+    inx 
+    stx text_show__address
+
+    sty text_show__char_index
+ 
+    ldx text_show__address
+    cpx #$2C00
+    bne @done
+
+    lda #%10101010
+    sta gameMODE
+@done:
+    rts
+;---------------------------------------------------------------
 
 ;NMI (vblank) code
 ;---------------------------------------------------------------
@@ -717,71 +835,27 @@ screen01:
     ;screen 01, fade in
     lda #%00000101
     sta gameMODE
+
 @fade_in:
     lda #$00
     sta palette_index
 
     ldy palette_offset
 
-    ; this should be a subroutine.
 palette_loop:
-    lda palette_index
-    sta $2121
-
-    ;put color
-    lda [palette_table_pointer], y
-    sta $2122
-    iny
-
-    lda [palette_table_pointer], y
-    sta $2122
-    iny
-
-    inc palette_index
-    lda palette_index
-    cmp #$10
-    bne palette_loop
-
-    lda palette_fade_direction
-    beq @up
-@down: 
-    rep #$20
-    lda palette_offset
-    beq @down_done
-
-    sec 
-    sbc #$0020
-    sta palette_offset
-    sep #$20
-    bra @done
-
-@down_done: 
-    sep #$20
-    lda palette_target_gameMODE
-    sta gameMODE
-    bra @done
-
-@up:
-    sty palette_offset
-    cpy #$0200
-    bne +
-
-    lda palette_target_gameMODE
-    sta gameMODE   
-    bra @done
-+
-    jmp end_interrupt
-
-@done:
-    ;-----------------------------------------
+    jsr palette_loop__routine
     jmp end_interrupt
 
 screen01_text:
 @init:
+    ; set the subsequent game mode
+    ; 000010 <-- screen01
+    ; 01 <-- "fade in" show text    
     lda #%00001001
     sta gameMODE
 
-    ;turn on other bg
+    ;turn on other bg 
+    ; 2 where text goes
     lda #%00000011
     sta $212C
 
@@ -791,50 +865,35 @@ screen01_text:
     sta $210B
 
     ; upload alphabet
+    ; I don't think we always need to do this
+    ; but will keep doing precautionarily.
     LoadBlockToVRAM Alphabet__01_graphic, $2000, $0C00
    
-    ; load a blank tilemap
+    ; load a blank tilemap 
+    ; clear the screen
     LoadBlockToVRAM blank_tilemap, $2800, blank_tilemap@end-blank_tilemap@begin
     lda #$28
     sta $2108
 
-    ;ldx screen01_text_map@message_begin
-    ldy #($2800 + ((screen01_text_map@message_begin - screen01_text_map@begin) / 2))
-    sty max_map
+    ; start at the address of where the message begins
+    ldx #($2800 + ((screen01_text_map@message_begin - screen01_text_map@begin) / 2))
+    stx text_show__address
 
-    ldx #$0000
-    stx map_index
+    ; index for moving through message
+    ldy #$0000
+    sty text_show__char_index
+
+    ; pointer 
+    lda #<screen01_text_map@message_begin
+    sta text_show__pointer
+    lda #>screen01_text_map@message_begin
+    sta text_show__pointer+1
+    lda #:screen01_text_map@message_begin
+    sta text_show__pointer+2
 
     ; fall through to one pass of showing text
 @show_text: 
-    ldx map_index 
-
-    lda #$80
-    sta $2115
-
-    ldy max_map
-    sty $2116
-
-    ;make this a pointer!
-    lda.l screen01_text_map@message_begin, x
-    sta $2118
-
-    lda.l screen01_text_map@message_begin+1, x
-    sta $2119
-
-    iny 
-    sty max_map
-
-    inx 
-    inx 
-    stx map_index
-    
-    ldy max_map
-    cpy #$2C00
-    bne end_interrupt
-
-    lda #%10101010
-    sta gameMODE
+    jsr show_text__routine
 
 end_interrupt:
     rep #$10
