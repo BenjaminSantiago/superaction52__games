@@ -16,7 +16,7 @@
 ;----------------------------------------------------------------------------
 .MACRO LoadPalette
     lda #\2
-    sta $2121       ; Start at START color
+    sta CGADD       ; Start at START color
     lda #:\1        ; Using : before the parameter gets its bank.
     ldx #\1         ; Not using : gets the offset address.
     ldy #(\3 * 2)   ; 2 bytes for every color

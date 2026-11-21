@@ -11,21 +11,23 @@
 
 ;------------------------------------------
 Start:
+    ; routine to clear registers
+    ; and establish default settings
     InitSNES            
 
     ;designate color no.0
-    stz $2121         
+    stz CGADD         
                         
     ;first byte of color (5E28)
     lda #$28    
-    sta $2122
+    sta CGDATA
 
     lda #$5E
-    sta $2122
+    sta CGDATA
 
     ;turn on the screen
     lda #$0F
-    sta $2100      
+    sta REG_DISPCNT     
 
 ;loop
 ;------------------------------------------
