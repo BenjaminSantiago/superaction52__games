@@ -1,10 +1,22 @@
+; 4BPP FULL IMAGE BG
+; by Benjamin Santiago
+; 
+; I first made this in like....2012 or 2014 or something like this, 
+; currently modifying it for 2026 in the following ways:
+; 
+; * comments are actually correct (ie what register do what)
+; * correcting some miscalculations (of bytes vs words)
+; * using the register names from the SNES Dev. Manual
+
+
 ;includes
 ;-----------------------------------------------------------------
-.INCLUDE "inc/header.inc"   ;<-- header for this ROM, must be first
+;header for this ROM, must be first
+.INCLUDE "inc/header.inc"   
 
 ;universal includes
-.INCLUDE "../__inc/registers.inc"
-.INCLUDE "../__inc/init_snes.inc"
+.INCLUDE "../../__inc/registers.inc"
+.INCLUDE "../../__inc/init_snes.inc"
 
 .INCLUDE "inc/LoadGraphics.asm"
 
@@ -26,39 +38,46 @@ Start:
 
     ; Load Tile data to VRAM
     ;---------------------------------
-    stz $210B           ; Set BG1's Character VRAM offset to $0000 (word address)
+    ; Set BG1's Character VRAM offset to $0000 (word address)
+    ; (snes has to know where to look for the data)
+    stz BG12NBA           
 
-    ;to determine size (3rd parameter)
-    ;you must, do this
-    ;8 * bits per pixel * number of characters so we have
-    ;8 * 4 * 896 = 28672 = 0x7000
-
-    LoadBlockToVRAM blue_head, $0000, $7000	
+    ; actually upload the data
+    ; the third calculation is: 
+    ; 256 * 224 (screen size) 
+    ; * 4 (4bpp, 16 palette entries)
+    ; /8 (8 bits per byte we are getting bytes to copy over)
+    LoadBlockToVRAM blue_head, $0000, (256*224*4/8)	
 
     ; Load tile map data to VRAM
     ; ---------------------------------
     ; we are trying to store an image which is essentially
     ; just a bunch of tiles in a consecutive sequence.
+    ; (i.e. we don't have an actual tilemap)
 
-    ; set to increment when writing to $2118
+    ; set to increment when writing to $2119
     lda #%10000000     
-    sta V_main
+    sta VMAIN
 
-    lda #$70            ; Set BG1's Tile Map offset
-    sta $2107           ; And the Tile Map size to 32x32
+    ; Set BG1's Tile Map offset
+    ; And the Tile Map size to 32x32
+    lda #$3C            
+    sta BG1SC
 
     ; set the starting address for the tilemap
-    ; (it must be at $7000 because that is the end 
+    ; (it must be after $3800 because that is the end 
     ; of where we are storing the character data)
-    ldx #$7000
-    stx V_Addr_L
+    ; we go to $3C00 so to avoid garbage data at the 
+    ; bottom of the screen (tilemap being read as visual data)
+    ldx #$3C00
+    stx VMADDL
 
     ;get x and y ready
     ldx #$0000
 
 ;--------------------------------------------------------
 blue_head_loop:      
-    stx V_Data_L    ;put tile number into VRAM Low.
+    stx VMDATAL    ;put tile number into VRAM Low.
              
     inx
     cpx #$0E00             
@@ -72,17 +91,19 @@ blue_head_loop:
     sta $2105    
 
     lda #$01            ; Enable BG1
-    sta $212C
+    sta TM
 
+    ; Turn on screen, full Brightness
     lda #$0F
-    sta $2100           ; Turn on screen, full Brightness
+    sta INIDISP
 
+    ;"Counter Enable" register this bit pattern enables NMI
     lda #%10000000
-    sta NMI_inimen       ;<--"Counter Enable" register this bit pattern enables NMI
+    sta NMITIMEN
 
     ;set the horizontal counter
     lda #$01
-    lda $4207
+    lda HTIMEL
 
 ;main loop
 ;-------------------------------------------------------
@@ -91,12 +112,12 @@ Infinity:
     ; scroll the graphic horizontally
    lda #$00
 scroll_h:     
-    sta BG_1_hofs
+    sta BG1HOFS
     wai 
     wai
     
-    adc #$01
-    cmp #$FF
+    sbc #$01
+    cmp #$00
     bne scroll_h
 
     jmp Infinity   
