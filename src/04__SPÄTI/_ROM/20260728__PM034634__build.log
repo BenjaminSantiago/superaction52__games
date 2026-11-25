@@ -1,0 +1,84 @@
+
+===== SNES assemble: main.asm =====
+Command: wla-65816 -v -o main.o main.asm
+Pass 1...
+Directive checks...
+Internal pass 1...
+Internal pass 2...
+-------------------------------------------------
+---                   ROM                     ---
+-------------------------------------------------
+ROM bank 0 (3752 bytes (11.45%) used)
+  - Outside .SECTIONs (32 bytes)
+    - Used space at $7fb2-$7fb5 (4 bytes).
+    - Used space at $7fc0-$7fdb (28 bytes).
+  - Sections (3720 bytes)
+    - .SECTION "!__WLA_SNESNATIVEVECTOR" (12 bytes).
+    - .SECTION "!__WLA_SNESEMUVECTOR" (12 bytes).
+    - .SECTION "EmptyVectors" (1 bytes).
+    - .SECTION "InitializeSNESCode" (284 bytes).
+    - .SECTION "LoadVRAMCode" (37 bytes).
+    - .SECTION "DMAPaletteCode" (33 bytes).
+    - .SECTION "MainCode" (3341 bytes).
+ROM bank 1 (18372 bytes (56.07%) used)
+  - Outside .SECTIONs (0 bytes)
+    - No data outside .SECTIONs.
+  - Sections (18372 bytes)
+    - .SECTION "graphic_and_audio__includes" (18372 bytes).
+ROM bank 2 (25440 bytes (77.64%) used)
+  - Outside .SECTIONs (0 bytes)
+    - No data outside .SECTIONs.
+  - Sections (25440 bytes)
+    - .SECTION "more_graphics" (25440 bytes).
+ROM bank 3 (16576 bytes (50.59%) used)
+  - Outside .SECTIONs (0 bytes)
+    - No data outside .SECTIONs.
+  - Sections (16576 bytes)
+    - .SECTION "yet_more_graphics" (16576 bytes).
+-------------------------------------------------
+---                   RAM                     ---
+-------------------------------------------------
+No .RAMSECTIONs were found, no information about RAM.
+-------------------------------------------------
+---                 SUMMARY                   ---
+-------------------------------------------------
+ROM: 64140 bytes (24.47%) used.
+RAM: No .RAMSECTIONs were found, no information about RAM.
+
+===== SNES link: /c/Users/Benjamin Santiago/Documents/_PROJECTS/superACTION52/GAMES/src/04__SPÄTI/_ROM/20260728__PM034634__DEBUG__SPATI-v01-----------.sfc =====
+Command: wlalink -v -r main.link /c/Users/Benjamin\ Santiago/Documents/_PROJECTS/superACTION52/GAMES/src/04__SPÄTI/_ROM/20260728__PM034634__DEBUG__SPATI-v01-----------.sfc
+-------------------------------------------------
+---                   ROM                     ---
+-------------------------------------------------
+ROM bank 0 (29012 bytes (88.54%) free)
+  - Free space at $0e70-$7fb1 (28994 bytes)
+  - Free space at $7fb6-$7fbf (10 bytes)
+  - Free space at $7fe0-$7fe3 (4 bytes)
+  - Free space at $7ff0-$7ff3 (4 bytes)
+ROM bank 1 (14396 bytes (43.93%) free)
+  - Free space at $47c4-$7fff (14396 bytes)
+ROM bank 2 (7328 bytes (22.36%) free)
+  - Free space at $6360-$7fff (7328 bytes)
+ROM bank 3 (16192 bytes (49.41%) free)
+  - Free space at $40c0-$7fff (16192 bytes)
+ROM bank 4 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 5 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 6 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 7 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+-------------------------------------------------
+---                   RAM                     ---
+-------------------------------------------------
+No .RAMSECTIONs were found, no information about RAM.
+-------------------------------------------------
+---           HEADERS AND FOOTERS             ---
+-------------------------------------------------
+No headers or footers found.
+-------------------------------------------------
+---                 SUMMARY                   ---
+-------------------------------------------------
+ROM: 198000 bytes (75.53%) free of total 262144.
+RAM: No .RAMSECTIONs were found, no information about RAM.

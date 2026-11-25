@@ -1,0 +1,4 @@
+
+===== SNES link: /c/Users/Benjamin Santiago/Documents/_PROJECTS/superACTION52/GAMES/src/04__SPÄTI/_ROM/20260728__PM034505__DEBUG__SPATI-v01-----------.sfc =====
+Command: wlalink -v -r main.link /c/Users/Benjamin\ Santiago/Documents/_PROJECTS/superACTION52/GAMES/src/04__SPÄTI/_ROM/20260728__PM034505__DEBUG__SPATI-v01-----------.sfc
+main.o: main.asm: INSERT_SECTIONS: No room for section "more_graphics" (42016 bytes) in ROM bank 2.

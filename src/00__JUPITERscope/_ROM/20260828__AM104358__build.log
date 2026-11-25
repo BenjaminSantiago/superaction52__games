@@ -1,0 +1,79 @@
+
+===== SNES assemble: main.asm =====
+Command: wla-65816 -v -o main.o main.asm
+Pass 1...
+Directive checks...
+Internal pass 1...
+Internal pass 2...
+-------------------------------------------------
+---                   ROM                     ---
+-------------------------------------------------
+ROM bank 0 (1827 bytes (5.58%) used)
+  - Outside .SECTIONs (32 bytes)
+    - Used space at $7fb2-$7fb5 (4 bytes).
+    - Used space at $7fc0-$7fdb (28 bytes).
+  - Sections (1795 bytes)
+    - .SECTION "!__WLA_SNESNATIVEVECTOR" (12 bytes).
+    - .SECTION "!__WLA_SNESEMUVECTOR" (12 bytes).
+    - .SECTION "EmptyVectors" (1 bytes).
+    - .SECTION "InitializeSNESCode" (284 bytes).
+    - .SECTION "LoadVRAMCode" (37 bytes).
+    - .SECTION "DMAPaletteCode" (33 bytes).
+    - .SECTION "MainCode" (1416 bytes).
+ROM bank 1 (31840 bytes (97.17%) used)
+  - Outside .SECTIONs (0 bytes)
+    - No data outside .SECTIONs.
+  - Sections (31840 bytes)
+    - .SECTION "CharacterData" (31840 bytes).
+ROM bank 2 (3136 bytes (9.57%) used)
+  - Outside .SECTIONs (0 bytes)
+    - No data outside .SECTIONs.
+  - Sections (3136 bytes)
+    - .SECTION "MORECharacterData" (3136 bytes).
+-------------------------------------------------
+---                   RAM                     ---
+-------------------------------------------------
+No .RAMSECTIONs were found, no information about RAM.
+-------------------------------------------------
+---                 SUMMARY                   ---
+-------------------------------------------------
+ROM: 36803 bytes (14.04%) used.
+RAM: No .RAMSECTIONs were found, no information about RAM.
+
+===== SNES link: /c/Users/Benjamin Santiago/Documents/_PROJECTS/superACTION52/GAMES/src/00__JUPITERscope/_ROM/20260828__AM104358__DEBUG__JUPITER-SCOPE-v01--.sfc =====
+Command: wlalink -v -r main.link /c/Users/Benjamin\ Santiago/Documents/_PROJECTS/superACTION52/GAMES/src/00__JUPITERscope/_ROM/20260828__AM104358__DEBUG__JUPITER-SCOPE-v01--.sfc
+-------------------------------------------------
+---                   ROM                     ---
+-------------------------------------------------
+ROM bank 0 (30937 bytes (94.41%) free)
+  - Free space at $06eb-$7fb1 (30919 bytes)
+  - Free space at $7fb6-$7fbf (10 bytes)
+  - Free space at $7fe0-$7fe3 (4 bytes)
+  - Free space at $7ff0-$7ff3 (4 bytes)
+ROM bank 1 (928 bytes (2.83%) free)
+  - Free space at $7c60-$7fff (928 bytes)
+ROM bank 2 (29632 bytes (90.43%) free)
+  - Free space at $0c40-$7fff (29632 bytes)
+ROM bank 3 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 4 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 5 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 6 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 7 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+-------------------------------------------------
+---                   RAM                     ---
+-------------------------------------------------
+No .RAMSECTIONs were found, no information about RAM.
+-------------------------------------------------
+---           HEADERS AND FOOTERS             ---
+-------------------------------------------------
+No headers or footers found.
+-------------------------------------------------
+---                 SUMMARY                   ---
+-------------------------------------------------
+ROM: 225337 bytes (85.96%) free of total 262144.
+RAM: No .RAMSECTIONs were found, no information about RAM.

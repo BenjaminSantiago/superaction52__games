@@ -1,0 +1,7 @@
+
+===== SNES assemble: main.asm =====
+Command: wla-65816 -v -o main.o main.asm
+Pass 1...
+main.asm:1239: FIND_FILE: Could not open "graphics\ROCKET__92.clr", searched in the following directories:
+./ (current directory)
+main.asm:1239: ERROR: Couldn't parse ".INCBIN".

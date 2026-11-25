@@ -19,7 +19,7 @@
 ;---------------
 ; use bits 0 and 1 in order to indicate
 ; 00 --> init
-; 01 --> fading in
+; 01 --> fading in / text revealing
 ; 10 --> fading out
 ; 11 --> loading vram data
 
@@ -55,10 +55,17 @@
 
 .EQU SCREEN__brightness $022F
 
+;-------------------------------
 ; this is SCRATCH for holding
 ; which numbered chunk of 
 ; vram we are uploading to
-.EQU vram_chunk $0230
+.EQU vram__chunk             $0230
+; eventually will make this a routine
+; but my brain don't work so good right now....
+;.EQU vram__tiles
+;.EQU vram__map              $023C
+;.EQU vram__target_gameMODE  
+;-------------------------------
 
 
 ; this is for making the palette fade to white
@@ -83,11 +90,11 @@
 ;-------------------------------
 .EQU text_show__address     $0236
 .EQU text_show__char_index  $0238
-.EQU text_show__pointer     $03
+.EQU text_show__pointer     $03 ;<-- 03 04 05
+.EQU text_show__target_gameMODE $023A
 ;-------------------------------
 
-.EQU max_map $236 ;<-- WORD
-.EQU map_index $238 
+.EQU ready_to_fade $023B    ;<-- flag
 ;---------------------------------------------------------------
 
 ;where the processor goes on reset
@@ -136,14 +143,21 @@ Start:
 
     stz SCREEN__brightness
 
-    stz vram_chunk
+    stz vram__chunk
     stz palette_index
     stz palette_offset
     stz palette_offset+1
     stz palette_fade_direction
     stz palette_table_pointer
     stz palette_target_gameMODE
-    stz max_map
+    stz text_show__address
+    stz text_show__char_index
+    stz text_show__char_index+1
+    stz text_show__pointer
+    stz text_show__pointer+1
+    stz text_show__pointer+2
+    stz text_show__target_gameMODE
+    stz ready_to_fade
     ;---------------------------------
 
     ;A/X/Y width (XY 16-bit & A 8-bit)   
@@ -234,28 +248,29 @@ pause:
 
 check_controls:
     lda gameMODE
-    bne go_to_game@done_with_controls
+    bne @otherMODES
 
     ;from the title screen, 
     ;wait for P1 to press any
     ;non-directional button press
     lda joy1H__p
     and #%11110000
-    bne go_to_game
+    bne @go_to_game
 
     lda joy1L__p
     and #%11110000
-    bne go_to_game
+    bne @go_to_game
 
-    bra go_to_game@done_with_controls
+    bra @otherMODES
 
-go_to_game:
+@go_to_game:
     ;set game mode to 
     ;000000 --> title
     ;10     --> fading out
     lda #%00000010
     sta gameMODE
-@done_with_controls:
+
+@otherMODES:
 
 main_game:
     lda gameMODE
@@ -482,10 +497,13 @@ palette_loop__routine:
     rts
 ;---------------------------------------------------------------
 
+; SHOW TEXT ROUTINE
 ;---------------------------------------------------------------    
 show_text__routine:   
     ldy text_show__char_index
 
+    ;VMAIN
+    ;Bit 7 = 1: increment the VRAM address after
     lda #$80
     sta $2115
 
@@ -523,7 +541,7 @@ show_text__routine:
     cpx #$2C00
     bne @done
 
-    lda #%10101010
+    lda text_show__target_gameMODE
     sta gameMODE
 @done:
     rts
@@ -683,8 +701,11 @@ check_the_gameMODE:
     ;11     --> load VRAM
     lda gameMODE
     cmp #%000000111
-    beq screen01@loadVRAM
+    bne +
+    
+    jmp screen01@loadVRAM
 
++
     ;000001 --> screen 1
     ;00     --> init
     lda gameMODE
@@ -710,6 +731,7 @@ check_the_gameMODE:
     jmp screen01_text@init
 
 +   
+    ;$09
     ;000010 --> screen 1 + text
     ;01     --> show text "fade in"         
     lda gameMODE
@@ -718,6 +740,88 @@ check_the_gameMODE:
 
     jmp screen01_text@show_text
 
++
+    ;$0B
+    ;000010 --> screen 1 + text
+    ;11     --> prepare to fade
+    lda gameMODE
+    cmp #%00001011
+    bne + 
+
+    jmp screen01_text@prepare_to_fade
+
+
++
+    ;$0A
+    ;000010 --> screen 1 + text
+    ;10     --> fade out
+    lda gameMODE
+    cmp #%00001010
+    bne +
+
+    jmp screen01_text@fade_out
++
+    ;000011 --> screen 2 
+    ;00     --> init 
+    lda gameMODE
+    cmp #%00001100
+    bne + 
+
+    jmp screen02@init
+
++
+    ;000011 --> screen 2 
+    ;11     --> load VRAM
+    lda gameMODE
+    cmp #%00001111
+    bne + 
+
+    jmp screen02@loadVRAM
+
++
+    ;000011 --> screen 2
+    ;01     --> fade in
+    lda gameMODE
+    cmp #%00001101
+    bne +
+
+    jmp screen02@fade_in
+
++
+    ;000100 --> screen 2 + text
+    ;00     --> init
+    lda gameMODE
+    cmp #%00010000
+    bne +
+
+    jmp screen02_text@init
+
++
+    ;000100 --> screen 2 + text
+    ;01     --> reveal text
+    lda gameMODE
+    cmp #%00010001
+    bne +
+
+    jmp screen02_text@show_text
+
++
+    ;000100 --> screen 2 + text
+    ;11     --> prepare to fade
+    lda gameMODE
+    cmp #%00010011
+    bne +
+
+    jmp screen02_text@prepare_to_fade
+
++
+    ;000100 --> screen 2 + text
+    ;10     --> reveal text
+    lda gameMODE
+    cmp #%00010010
+    bne +
+
+    jmp screen02_text@fade_out
 +
     jmp end_interrupt
 
@@ -756,18 +860,18 @@ title__fadeOUT:
     ;--------------------------------
 screen01:
 @loadVRAM:    
-    lda vram_chunk
+    lda vram__chunk
     beq @loadVRAM__chunk00
 
-    lda vram_chunk
+    lda vram__chunk
     cmp #$01
     beq @loadVRAM__chunk01
 
-    lda vram_chunk
+    lda vram__chunk
     cmp #$02
     beq @loadVRAM__chunk02
 
-    lda vram_chunk
+    lda vram__chunk
     cmp #$03
     beq @loadVRAM__chunk03
 
@@ -775,22 +879,22 @@ screen01:
 
 @loadVRAM__chunk00:
     LoadBlockToVRAM FIELDclosed__tiles,     $0000, $0800
-    inc vram_chunk
+    inc vram__chunk
     jmp @done_with_VRAMchunks
 
 @loadVRAM__chunk01:
     LoadBlockToVRAM FIELDclosed__tiles+$0800, $0400, $0800
-    inc vram_chunk
+    inc vram__chunk
     jmp @done_with_VRAMchunks
 
 @loadVRAM__chunk02:
     LoadBlockToVRAM FIELDclosed__tiles+$1000, $0800, $0800
-    inc vram_chunk
+    inc vram__chunk
     jmp @done_with_VRAMchunks
 
 @loadVRAM__chunk03:
     LoadBlockToVRAM FIELDclosed__tiles+$1800, $0C00, $0120
-    inc vram_chunk
+    inc vram__chunk
     jmp @done_with_VRAMchunks
 
 @loadMAP:
@@ -871,6 +975,7 @@ screen01_text:
    
     ; load a blank tilemap 
     ; clear the screen
+    ; (probably can do this on init?)
     LoadBlockToVRAM blank_tilemap, $2800, blank_tilemap@end-blank_tilemap@begin
     lda #$28
     sta $2108
@@ -891,9 +996,272 @@ screen01_text:
     lda #:screen01_text_map@message_begin
     sta text_show__pointer+2
 
+    ; have this be "show text --> idle" 
+    lda #%00001011
+    sta text_show__target_gameMODE
+
     ; fall through to one pass of showing text
 @show_text: 
     jsr show_text__routine
+    jmp end_interrupt
+
+@prepare_to_fade:
+    lda #$00
+    sta palette_index
+    
+    ldy #$0000
+    sty palette_offset
+
+    ldy palette_offset
+    stz palette_fade_direction
+
+    lda #<FIELDclosed__toWHITE__begin
+    sta palette_table_pointer
+
+    lda #>FIELDclosed__toWHITE__begin
+    sta palette_table_pointer+1
+
+    lda #:FIELDclosed__toWHITE__begin
+    sta palette_table_pointer+2
+
+    ;000011 --> screen 2 
+    ;11     --> load VRAM
+    lda #%00001111
+    sta palette_target_gameMODE
+
+    lda #%00001010
+    sta gameMODE
+
+    ; need this for later
+    stz vram__chunk 
+
+    jmp end_interrupt
+
+@fade_out:
+    lda #$00
+    sta palette_index
+    ldy palette_offset
+    jmp palette_loop
+
+screen02:
+@loadVRAM:
+    lda vram__chunk
+    beq @loadVRAM__chunk00
+
+    lda vram__chunk
+    cmp #$01
+    beq @loadVRAM__chunk01
+
+    lda vram__chunk
+    cmp #$02
+    beq @loadVRAM__chunk02
+
+    lda vram__chunk
+    cmp #$03
+    beq @loadVRAM__chunk03
+
+    lda vram__chunk
+    cmp #$04
+    bne +
+    
+    jmp @loadVRAM__chunk04
+
++   lda vram__chunk
+    cmp #$05
+    bne +
+    
+    jmp @loadVRAM__chunk05
++
+    jmp @loadMAP
+
+@loadVRAM__chunk00:
+    LoadBlockToVRAM screen02__tiles,     $0000, $0800
+    inc vram__chunk
+    jmp @done_with_VRAMchunks
+
+@loadVRAM__chunk01:
+    LoadBlockToVRAM screen02__tiles+$0800, $0400, $0800
+    inc vram__chunk
+    jmp @done_with_VRAMchunks
+
+@loadVRAM__chunk02:
+    LoadBlockToVRAM screen02__tiles+$1000, $0800, $0800
+    inc vram__chunk
+    jmp @done_with_VRAMchunks
+
+@loadVRAM__chunk03:
+    LoadBlockToVRAM screen02__tiles+$1800, $0C00, $0800
+    inc vram__chunk
+    jmp @done_with_VRAMchunks
+
+@loadVRAM__chunk04:
+    LoadBlockToVRAM screen02__tiles+$2000, $1000, $0800
+    inc vram__chunk
+    jmp @done_with_VRAMchunks
+
+@loadVRAM__chunk05:
+    LoadBlockToVRAM screen02__tiles+$2800, $1400, $0800
+    inc vram__chunk
+    jmp @done_with_VRAMchunks
+
+@loadMAP:
+    LoadBlockToVRAM screen02__map, $1400, $0700
+        
+    ; link tilemap
+    lda #$14
+    sta $2107
+
+    ; load a blank tilemap 
+    ; clear the screen
+    ; (probably can do this on init?)
+    LoadBlockToVRAM blank_tilemap, $2800, blank_tilemap@end-blank_tilemap@begin
+    lda #$28
+    sta $2108
+
+    ;screen 02 init
+    lda #%00001100
+    sta gameMODE
+@done_with_VRAMchunks:
+    jmp end_interrupt
+    ;--------------------------------
+    
+@init:
+    ;max out palette init
+    ldy #$01E0
+    sty palette_offset
+    
+    ;going up the table
+    lda #$01
+    sta palette_fade_direction
+
+    ;point 'em up
+    lda #<DINER__toWHITE@begin
+    sta palette_table_pointer
+
+    lda #>DINER__toWHITE@begin
+    sta palette_table_pointer+1
+
+    lda #:DINER__toWHITE@begin
+    sta palette_table_pointer+2
+    
+    ;000100 --> screen 2 + text
+    ;00     --> init
+    lda #%00010000
+    sta palette_target_gameMODE
+
+    ; we are done with in it, 
+    ; advance game mode
+    ;screen 02, fade in
+    lda #%00001101
+    sta gameMODE
+    jmp end_interrupt
+
+@fade_in:
+    lda #$00
+    sta palette_index
+
+    ldy palette_offset
+    jmp palette_loop
+
+screen02_text:
+@init:
+    ;000100 --> screen 2 + text
+    ;01     --> reveal text
+    lda #%00010001
+    sta gameMODE
+
+    ; BG1 character base = $0000, 
+    ; BG2 character base = $2000.
+    lda #$20
+    sta $210B
+
+    ; start at the address of where the message begins
+    ldx #($2800 + ((screen02_text_map@message_begin - screen02_text_map@begin) / 2))
+    stx text_show__address
+
+    ; index for moving through message
+    ldy #$0000
+    sty text_show__char_index
+
+    ; pointer 
+    lda #<screen02_text_map@message_begin
+    sta text_show__pointer
+    lda #>screen02_text_map@message_begin
+    sta text_show__pointer+1
+    lda #:screen02_text_map@message_begin
+    sta text_show__pointer+2
+
+    ; have this be "show text --> idle" 
+    lda #%00010011
+    sta text_show__target_gameMODE
+
+    ; fall through to one pass of showing text
+
+@show_text:
+    jsr show_text__routine
+    jmp end_interrupt
+
+@prepare_to_fade:
+    lda #$00
+    sta palette_index
+    
+    ldy #$0000
+    sty palette_offset
+
+    ldy palette_offset
+    stz palette_fade_direction
+
+    lda #<DINER__toWHITE@begin
+    sta palette_table_pointer
+
+    lda #>DINER__toWHITE@begin
+    sta palette_table_pointer+1
+
+    lda #:DINER__toWHITE@begin
+    sta palette_table_pointer+2
+
+    ;000101 --> screen 3
+    ;11     --> load VRAM
+    lda #%00010111
+    sta palette_target_gameMODE
+
+    lda #%00010010
+    sta gameMODE
+
+    ; need this for later
+    stz vram__chunk 
+
+    jmp end_interrupt
+    
+@fade_out:
+    lda #$00
+    sta palette_index
+    ldy palette_offset
+    jmp palette_loop
+
+screen03:
+@loadVRAM:
+@init:
+@fade_in:
+
+screen03_text:
+@init:
+@show_text:
+@prepare_to_fade:
+@fade_out:
+
+screen04:
+@loadVRAM:
+@init:
+@fade_in:
+
+screen04_text:
+@init:
+@show_text:
+@prepare_to_fade:
+@fade_out:
+
+
 
 end_interrupt:
     rep #$10
@@ -907,9 +1275,11 @@ end_interrupt:
 
 ;---------------------------------------------------------------
 
+; palette transition tables
 ;---------------------------------------------------------------
-    .INC "inc/FIELDclosed__toWHITE.inc"
     .INC "inc/title__DIPtoWHITE.inc"
+    .INC "inc/FIELDclosed__toWHITE.inc"
+    .INC "inc/DINER__toWHITE.inc"
 ;---------------------------------------------------------------
 .ENDS
 
@@ -925,23 +1295,91 @@ Alphabet__01_graphic:
     .INCBIN "_graphics/Alphabet__01__v02_strip.pic"
     
     .INC "inc/blank_tilemap.inc"
-    .INC "inc/howl.inc"
     .INC "inc/screen01__text.inc"
+    .INC "inc/screen02__text.inc"
+    ;.INC "inc/screen03__text.inc"
+    ;.INC "inc/screen04__text.inc"
 
 Spati__title_palette:
     .INCBIN "_graphics/SPATItitle__palette.clr"
-Spati__title_tiles:
-    .INCBIN "_graphics/SPATItitle__tiles.pic"
-Spati__title_map:
-    .INCBIN "_graphics/SPATItitle__tilemap.map"
-
 FIELDclosed__palette:
     .INCBIN "_graphics/FIELDclosed__86.clr"
+screen02__palette:
+    .INCBIN "_graphics/DINER.clr"
+screen03__palette:
+    .INCBIN "_graphics/LIGHTpost__88.clr"
+screen04__palette:
+    .INCBIN "_graphics/ROCKET__92.clr"
+
+Spati__title_map:
+    .INCBIN "_graphics/SPATItitle__tilemap.map"
 FIELDclosed__map:
     .INCBIN "_graphics/FIELDclosed__86.map"
-FIELDclosed__tiles:
-    .INCBIN "_graphics/FIELDclosed__86.pic"
-
-
+screen02__map:
+    .INCBIN "_graphics/DINER.map"
+screen03__map:
+    .INCBIN "_graphics/LIGHTpost__88.map"
+screen04__map:
+    .INCBIN "_graphics/ROCKET__92.map"
 ;---------------------------------------------------------------
 .ENDS
+
+;---------------------------------------------------------------
+.BANK 2 SLOT 0
+.ORG 0
+.SECTION "graphics__02"
+
+Spati__title_tiles:
+    .INCBIN "_graphics/SPATItitle__tiles.pic"
+screen02__tiles:
+    .INCBIN "_graphics/DINER.pic"
+screen03__tiles:
+    .INCBIN "_graphics/LIGHTpost__88.pic"
+FIELDclosed__tiles:
+    .INCBIN "_graphics/FIELDclosed__86.pic"  
+.ENDS
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+.BANK 3 SLOT 0
+.ORG 0
+.SECTION "graphics__03"
+
+screen04__tiles:
+    .INCBIN "_graphics/ROCKET__92.pic"
+
+.ENDS
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+.BANK 4 SLOT 0
+.ORG 0
+.SECTION "graphics__04"
+
+
+.ENDS
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+.BANK 5 SLOT 0
+.ORG 0
+.SECTION "graphics__05"
+
+.ENDS
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+.BANK 6 SLOT 0
+.ORG 0
+.SECTION "graphics__06"
+
+.ENDS
+;---------------------------------------------------------------
+
+;---------------------------------------------------------------
+.BANK 7 SLOT 0
+.ORG 0
+.SECTION "graphics__07"
+
+.ENDS
+;---------------------------------------------------------------
