@@ -16,50 +16,50 @@
 .SECTION "MainCode"
 
 Start:
-    InitSNES    ; Clear registers, etc.
+    ; Clear registers, etc.
+    InitSNES    
 
-    ; Load Palette to VRAM
+    ; Load Palette to CGRAM
     ;--------------------------------
-    ;4bits per pixel so 256 palette entries
+    ;8bits per pixel so 256 palette entries
 
     LoadPalette blue_palette_256, 0, 256
 
     ; Load Tile data to VRAM
-    ;---------------------------------
-    stz $210B           ; Set BG1's Character VRAM offset to $0000 (word address)
+    ;--------------------------------
+    stz BG12NBA           ; Set BG1's Character VRAM offset to $0000 (word address)
 
     ;to determine size (3rd parameter)
     ;you must, do this
     ;8 * color depth (in bits) * number_of_characters
-    ;
+
+    ;we need to transfer two blocks because of our ROM mapping (LoROM)
 
     LoadBlockToVRAM blue_head_8bpp_1, $0000, $7000	
     LoadBlockToVRAM blue_head_8bpp_2, $37E0, $7200
 
     ; Load tile map data to VRAM
     ; ---------------------------------
-    ; we are trying to store an image which is essentially
+    ; we are trying to store an image which is 
     ; just a bunch of tiles in a consecutive sequence.
 
     ; set to increment when writing to $2118
     lda #%10000000     
-    sta V_main
+    sta VMAIN
 
     lda #$70            ; Set BG1's Tile Map offset
-    sta $2107           ; And the Tile Map size to 32x32
+    sta BG1SC           ; And the Tile Map size to 32x32
 
     ; set the starting address for the tilemap
     ; (it must be at $E000 because that is the end 
     ; of where we are storing the character data)
     ldx #$7000
-    stx V_Addr_L
+    stx VMADDL
 
-    ;get x and y ready
     ldx #$0000
-
 ;--------------------------------------------------------
 blue_head_loop:      
-    stx V_Data_L    ;put tile number into VRAM Low.
+    stx VMDATAL    ;put tile number into VRAM Low.
              
     inx
     cpx #$0E00             
@@ -68,17 +68,17 @@ blue_head_loop:
 
     ;8bpp/256 color images
     ;which has that option for bg 3
-    lda #%00000011      
-    sta $2105    
+    lda #%00000011   
+    sta BGMODE    
 
     lda #$01            ; Enable BG1
-    sta $212C
+    sta TM
 
     lda #$0F
-    sta $2100           ; Turn on screen, full Brightness
+    sta INIDISP           ; Turn on screen, full Brightness
 
     lda #%10000000
-    sta NMI_inimen       ;<--"Counter Enable" register this bit pattern enables NMI
+    sta NMITIMEN      ;<--"Counter Enable" register this bit pattern enables NMI
 
     ;set the horizontal counter
     lda #$01
