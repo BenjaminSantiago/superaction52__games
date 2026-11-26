@@ -13,39 +13,6 @@
 .INCLUDE "inc/init.inc"
 .INCLUDE "inc/load_graphics.asm"
 
-; REGISTERS
-;------------------------------------------
-; https://snes.nesdev.org/wiki/PPU_registers
-
-; CGRAM is "color graphics ram" 
-; where the palette data lives
-
-; $2100 --> INIDISP -->  FXXX BBBB --> force blanking (f), and screen brightness (b)
-; $2121 --> CGADD   --> which color to write
-; $2122 --> CGDATA  --> the color to write
-
-; $210B --> BG12NBA
-; $2115 --> VMAIN
-; $2116 --> VADDRL
-; $2105 --> BGMODE
-; $212C --> TM 
-; $4200 --> NMITIMEN
-
-;   controller registers
-;   JOY1H       JOY1L
-;   $4219       $4218
-;15  bit  8   7  bit  0
-; ---- ----   ---- ----
-; BYsS UDLR   AXlr 0000
-; |||| ||||   |||| ||||
-; |||| ||||   |||| ++++- Signature
-; |||| ||||   ||++------ L/R shoulder buttons
-; |||| ||||   ++-------- A/X buttons
-; |||| ++++------------- D-pad
-; ||++------------------ Select (s) and Start (S)
-; ++-------------------- B/Y buttons
-;------------------------------------------
-
 ; VARIABLES 
 ;------------------------------------------
 ; $0000 - $0220 --> "shadow" of OAM

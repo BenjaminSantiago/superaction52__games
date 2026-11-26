@@ -1,0 +1,74 @@
+
+===== SNES assemble: main.asm =====
+Command: wla-65816 -v -o main.o main.asm
+Pass 1...
+Directive checks...
+Internal pass 1...
+Internal pass 2...
+-------------------------------------------------
+---                   ROM                     ---
+-------------------------------------------------
+ROM bank 0 (536 bytes (1.64%) used)
+  - Outside .SECTIONs (32 bytes)
+    - Used space at $7fb2-$7fb5 (4 bytes).
+    - Used space at $7fc0-$7fdb (28 bytes).
+  - Sections (504 bytes)
+    - .SECTION "!__WLA_SNESNATIVEVECTOR" (12 bytes).
+    - .SECTION "!__WLA_SNESEMUVECTOR" (12 bytes).
+    - .SECTION "EmptyVectors" (1 bytes).
+    - .SECTION "InitializeSNESCode" (284 bytes).
+    - .SECTION "LoadVRAMCode" (37 bytes).
+    - .SECTION "DMAPaletteCode" (33 bytes).
+    - .SECTION "MainCode" (125 bytes).
+ROM bank 1 (28704 bytes (87.60%) used)
+  - Outside .SECTIONs (0 bytes)
+    - No data outside .SECTIONs.
+  - Sections (28704 bytes)
+    - .SECTION "CharacterData" (28704 bytes).
+-------------------------------------------------
+---                   RAM                     ---
+-------------------------------------------------
+No .RAMSECTIONs were found, no information about RAM.
+-------------------------------------------------
+---                 SUMMARY                   ---
+-------------------------------------------------
+ROM: 29240 bytes (11.15%) used.
+RAM: No .RAMSECTIONs were found, no information about RAM.
+
+===== SNES link: /c/Users/Benjamin Santiago/Documents/_PROJECTS/superACTION52/GAMES/src/_ref/bg__full_img_4bpp/_ROM/20261125__PM031346__RELEASE__full-screen-image---.smc =====
+Command: wlalink -v -r main.link /c/Users/Benjamin\ Santiago/Documents/_PROJECTS/superACTION52/GAMES/src/_ref/bg__full_img_4bpp/_ROM/20261125__PM031346__RELEASE__full-screen-image---.smc
+-------------------------------------------------
+---                   ROM                     ---
+-------------------------------------------------
+ROM bank 0 (32228 bytes (98.35%) free)
+  - Free space at $01e0-$7fb1 (32210 bytes)
+  - Free space at $7fb6-$7fbf (10 bytes)
+  - Free space at $7fe0-$7fe3 (4 bytes)
+  - Free space at $7ff0-$7ff3 (4 bytes)
+ROM bank 1 (4064 bytes (12.40%) free)
+  - Free space at $7020-$7fff (4064 bytes)
+ROM bank 2 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 3 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 4 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 5 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 6 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+ROM bank 7 (32768 bytes (100.00%) free)
+  - Free space at $0000-$7fff (32768 bytes)
+-------------------------------------------------
+---                   RAM                     ---
+-------------------------------------------------
+No .RAMSECTIONs were found, no information about RAM.
+-------------------------------------------------
+---           HEADERS AND FOOTERS             ---
+-------------------------------------------------
+No headers or footers found.
+-------------------------------------------------
+---                 SUMMARY                   ---
+-------------------------------------------------
+ROM: 232900 bytes (88.84%) free of total 262144.
+RAM: No .RAMSECTIONs were found, no information about RAM.

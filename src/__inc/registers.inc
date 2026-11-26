@@ -756,62 +756,158 @@
 
 ; Name: Joypad 1 Data, Low Byte (JOY1L)
 ;
-; 16-bit joypad auto-read result (first read high to last read low).
+; Standard SNES controller auto-read result. Button bits: 1 = pressed, 0 = released.
 ;
 ; Access: Read-only, byte of a register pair
 ;
+; With 8-bit A, LDA JOY1L reads this byte; use the 8-bit masks below.
+; With 16-bit A, LDA JOY1L reads the complete pair; use the 16-bit masks.
+;
 ; ```text
-; 7  bit  0
-; ---- ----
-; LLLL LLLL
+; JOY1H ($4219):  7   6    5      4     3    2     1     0
+;                B   Y  Select Start  Up  Down  Left  Right
+; JOY1L ($4218):  7   6    5      4     3    2     1     0
+;                A   X    L      R     0    0     0     0
 ; ```
 ;
+; | Register bit | Button | 8-bit mask | 16-bit mask |
+; | --- | --- | --- | --- |
+; | `JOY1H.7` | B | `$80` | `$8000` |
+; | `JOY1H.6` | Y | `$40` | `$4000` |
+; | `JOY1H.5` | Select | `$20` | `$2000` |
+; | `JOY1H.4` | Start | `$10` | `$1000` |
+; | `JOY1H.3` | Up | `$08` | `$0800` |
+; | `JOY1H.2` | Down | `$04` | `$0400` |
+; | `JOY1H.1` | Left | `$02` | `$0200` |
+; | `JOY1H.0` | Right | `$01` | `$0100` |
+; | `JOY1L.7` | A | `$80` | `$0080` |
+; | `JOY1L.6` | X | `$40` | `$0040` |
+; | `JOY1L.5` | L shoulder | `$20` | `$0020` |
+; | `JOY1L.4` | R shoulder | `$10` | `$0010` |
+;
+; JOY1L bits 3-0 are zero for a standard controller. L/R in the low byte are shoulder buttons.
+; In the complete 16-bit result, JOY1H occupies bits 15-8 and JOY1L occupies bits 7-0.
+; Other controller types can use a different bit layout.
+;
 ; [SNESdev reference](https://snes.nesdev.org/wiki/MMIO_registers#JOY1)
+; [Controller bit mapping](https://patrickjohnston.org/ASM/ROM%20data/snestek.htm#snescontrollersioportsautomaticreading)
 .EQU JOY1L        $4218
 
 ; Name: Joypad 1 Data, High Byte (JOY1H)
 ;
-; 16-bit joypad auto-read result (first read high to last read low).
+; Standard SNES controller auto-read result. Button bits: 1 = pressed, 0 = released.
 ;
 ; Access: Read-only, byte of a register pair
 ;
+; With 8-bit A, LDA JOY1H reads this byte; use the 8-bit masks below.
+; With 16-bit A, LDA JOY1L reads the complete pair; use the 16-bit masks.
+;
 ; ```text
-; 7  bit  0
-; ---- ----
-; HHHH HHHH
+; JOY1H ($4219):  7   6    5      4     3    2     1     0
+;                B   Y  Select Start  Up  Down  Left  Right
+; JOY1L ($4218):  7   6    5      4     3    2     1     0
+;                A   X    L      R     0    0     0     0
 ; ```
 ;
+; | Register bit | Button | 8-bit mask | 16-bit mask |
+; | --- | --- | --- | --- |
+; | `JOY1H.7` | B | `$80` | `$8000` |
+; | `JOY1H.6` | Y | `$40` | `$4000` |
+; | `JOY1H.5` | Select | `$20` | `$2000` |
+; | `JOY1H.4` | Start | `$10` | `$1000` |
+; | `JOY1H.3` | Up | `$08` | `$0800` |
+; | `JOY1H.2` | Down | `$04` | `$0400` |
+; | `JOY1H.1` | Left | `$02` | `$0200` |
+; | `JOY1H.0` | Right | `$01` | `$0100` |
+; | `JOY1L.7` | A | `$80` | `$0080` |
+; | `JOY1L.6` | X | `$40` | `$0040` |
+; | `JOY1L.5` | L shoulder | `$20` | `$0020` |
+; | `JOY1L.4` | R shoulder | `$10` | `$0010` |
+;
+; JOY1L bits 3-0 are zero for a standard controller. L/R in the low byte are shoulder buttons.
+; In the complete 16-bit result, JOY1H occupies bits 15-8 and JOY1L occupies bits 7-0.
+; Other controller types can use a different bit layout.
+;
 ; [SNESdev reference](https://snes.nesdev.org/wiki/MMIO_registers#JOY1)
+; [Controller bit mapping](https://patrickjohnston.org/ASM/ROM%20data/snestek.htm#snescontrollersioportsautomaticreading)
 .EQU JOY1H        $4219
 
 ; Name: Joypad 2 Data, Low Byte (JOY2L)
 ;
-; 16-bit joypad auto-read result (first read high to last read low).
+; Standard SNES controller auto-read result. Button bits: 1 = pressed, 0 = released.
 ;
 ; Access: Read-only, byte of a register pair
 ;
+; With 8-bit A, LDA JOY2L reads this byte; use the 8-bit masks below.
+; With 16-bit A, LDA JOY2L reads the complete pair; use the 16-bit masks.
+;
 ; ```text
-; 7  bit  0
-; ---- ----
-; LLLL LLLL
+; JOY2H ($421B):  7   6    5      4     3    2     1     0
+;                B   Y  Select Start  Up  Down  Left  Right
+; JOY2L ($421A):  7   6    5      4     3    2     1     0
+;                A   X    L      R     0    0     0     0
 ; ```
 ;
+; | Register bit | Button | 8-bit mask | 16-bit mask |
+; | --- | --- | --- | --- |
+; | `JOY2H.7` | B | `$80` | `$8000` |
+; | `JOY2H.6` | Y | `$40` | `$4000` |
+; | `JOY2H.5` | Select | `$20` | `$2000` |
+; | `JOY2H.4` | Start | `$10` | `$1000` |
+; | `JOY2H.3` | Up | `$08` | `$0800` |
+; | `JOY2H.2` | Down | `$04` | `$0400` |
+; | `JOY2H.1` | Left | `$02` | `$0200` |
+; | `JOY2H.0` | Right | `$01` | `$0100` |
+; | `JOY2L.7` | A | `$80` | `$0080` |
+; | `JOY2L.6` | X | `$40` | `$0040` |
+; | `JOY2L.5` | L shoulder | `$20` | `$0020` |
+; | `JOY2L.4` | R shoulder | `$10` | `$0010` |
+;
+; JOY2L bits 3-0 are zero for a standard controller. L/R in the low byte are shoulder buttons.
+; In the complete 16-bit result, JOY2H occupies bits 15-8 and JOY2L occupies bits 7-0.
+; Other controller types can use a different bit layout.
+;
 ; [SNESdev reference](https://snes.nesdev.org/wiki/MMIO_registers#JOY2)
+; [Controller bit mapping](https://patrickjohnston.org/ASM/ROM%20data/snestek.htm#snescontrollersioportsautomaticreading)
 .EQU JOY2L        $421A
 
 ; Name: Joypad 2 Data, High Byte (JOY2H)
 ;
-; 16-bit joypad auto-read result (first read high to last read low).
+; Standard SNES controller auto-read result. Button bits: 1 = pressed, 0 = released.
 ;
 ; Access: Read-only, byte of a register pair
 ;
+; With 8-bit A, LDA JOY2H reads this byte; use the 8-bit masks below.
+; With 16-bit A, LDA JOY2L reads the complete pair; use the 16-bit masks.
+;
 ; ```text
-; 7  bit  0
-; ---- ----
-; HHHH HHHH
+; JOY2H ($421B):  7   6    5      4     3    2     1     0
+;                B   Y  Select Start  Up  Down  Left  Right
+; JOY2L ($421A):  7   6    5      4     3    2     1     0
+;                A   X    L      R     0    0     0     0
 ; ```
 ;
+; | Register bit | Button | 8-bit mask | 16-bit mask |
+; | --- | --- | --- | --- |
+; | `JOY2H.7` | B | `$80` | `$8000` |
+; | `JOY2H.6` | Y | `$40` | `$4000` |
+; | `JOY2H.5` | Select | `$20` | `$2000` |
+; | `JOY2H.4` | Start | `$10` | `$1000` |
+; | `JOY2H.3` | Up | `$08` | `$0800` |
+; | `JOY2H.2` | Down | `$04` | `$0400` |
+; | `JOY2H.1` | Left | `$02` | `$0200` |
+; | `JOY2H.0` | Right | `$01` | `$0100` |
+; | `JOY2L.7` | A | `$80` | `$0080` |
+; | `JOY2L.6` | X | `$40` | `$0040` |
+; | `JOY2L.5` | L shoulder | `$20` | `$0020` |
+; | `JOY2L.4` | R shoulder | `$10` | `$0010` |
+;
+; JOY2L bits 3-0 are zero for a standard controller. L/R in the low byte are shoulder buttons.
+; In the complete 16-bit result, JOY2H occupies bits 15-8 and JOY2L occupies bits 7-0.
+; Other controller types can use a different bit layout.
+;
 ; [SNESdev reference](https://snes.nesdev.org/wiki/MMIO_registers#JOY2)
+; [Controller bit mapping](https://patrickjohnston.org/ASM/ROM%20data/snestek.htm#snescontrollersioportsautomaticreading)
 .EQU JOY2H        $421B
 
 ; Name: Direct Memory Access Parameters, Channel 0 (DMAP0)
