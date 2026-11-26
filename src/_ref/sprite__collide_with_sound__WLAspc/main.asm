@@ -58,13 +58,13 @@ Start:
     SoundSendLoop:
     lda.l spc_program, X    ;first byte of stuff from spc program, offset by x
 
-    sta $2141           ;chunk of stuff goes to $2141
+    sta APUIO1           ;chunk of stuff goes to $2141
 
     txa                 ;transfer x to a (counter var is now in a)
                         ;(x is being preserved for end of transfer)
-    sta $2140           ;store offset in $2140
+    sta APUIO0           ;store offset in $2140
 
--       cmp $2140           ;wait for SPC to echo back the same value
+-   cmp $2140           ;wait for SPC to echo back the same value
     bne -           
     inx                 ;increment counter 
     cpx #spcend - spc_program
@@ -74,11 +74,11 @@ Start:
 
     ;end transfer
     ;------------------------------------------------------
-    stz $2141       ;Mark end of data
+    stz APUIO1       ;Mark end of data
                     ;why port 1--> 1 is the "command/data" port
 
     ldy #$0400      ;Set starting address of SPC code
-    sty $2142       ;2142/ports 2 and 3 are the address ports
+    sty APUIO2       ;2142/ports 2 and 3 are the address ports
 
     inx
     inx             ;why two increments?
@@ -88,9 +88,6 @@ Start:
     sta $2140       ;Tell SPC to begin executing its program
     ;------------------------------------------------------
 
-
-
-
     ;A/X/Y width (XY 16-bit & A 8-bit)   
     rep #$10    
     sep #$20
@@ -99,14 +96,14 @@ Start:
     ;2105.b0    --> bg mode 1
     ;2015.b3    --> character priority (I think this puts sprites above BGs?)
     lda #%00001001
-    sta $2105
+    sta BGMODE
 
     ;initial bg color (white $7FFF)
-    stz $2121
+    stz CGADD
     lda #$FF
-    sta $2122
+    sta CGDATA
     lda #$7F
-    sta $2122
+    sta CGDATA
     
     ; Load Palette for our tiles
     LoadPalette sprite_palette, 128, 16     ; Sprite Palettes start at color 128

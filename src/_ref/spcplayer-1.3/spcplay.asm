@@ -20,7 +20,6 @@
 
  .bank 0
  .section "MainCode"
- 
  .include "loadspc.asm"
  
  Start:

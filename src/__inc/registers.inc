@@ -540,7 +540,12 @@
 
 ; Name: Audio Processing Unit Input/Output Port 0 (APUIO0)
 ;
-; Data to/from APU.
+; 8-bit communication port between the main CPU and the SPC700 sound CPU.
+; STA APUIO0 sends a byte for the sound CPU to read at its $F4 port.
+; LDA APUIO0 reads the byte last sent back by the sound CPU through $F4.
+; Reads and writes use separate storage: reading does not return your own write.
+; The code running on the sound CPU decides what each byte means.
+; This is port 0 of the four communication ports at $2140-$2143.
 ;
 ; Access: Read/write, 8-bit
 ;
@@ -550,6 +555,7 @@
 ; DDDD DDDD
 ; ```
 ;
+; [Nintendo manual](https://floating.muncher.se/bot/manual/book1_text.pdf#page=161)
 ; [SNESdev reference](https://snes.nesdev.org/wiki/MMIO_registers#APUIOn)
 .EQU APUIO0       $2140
 
