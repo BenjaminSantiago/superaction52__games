@@ -5,6 +5,7 @@
 ; https://floating.muncher.se/bot/manual/book1_text.pdf#page=115
 ; BG = Background; SC = Screen; NBA = Name Base Address; OFS = Offset.
 ; VRAM = Video Random Access Memory; CG = Color Generator.
+; OAM = Object Attribute Memory; OBJ = Object (sprite).
 ; APU = Audio Processing Unit; PPU = Picture Processing Unit; I/O = Input/Output.
 ; DMA = Direct Memory Access; HDMA = Horizontal Blanking DMA.
 ; NMI = Non-Maskable Interrupt; IRQ = Interrupt Request.
@@ -62,6 +63,49 @@
 ;
 ; [SNESdev reference](https://snes.nesdev.org/wiki/PPU_registers#OBJSEL)
 .EQU OBJSEL       $2101
+
+; Name: Object Attribute Memory Address, Low Byte (OAMADDL)
+;
+; OAM holds sprite positions, tile numbers, palette choices, and other attributes.
+; Sets bits 0-7 of the 9-bit OAM word address; OAMADDH supplies bit 8.
+; Set OAMADDL and OAMADDH to $00 before a full sprite upload so writes through
+; $2104 begin at sprite 0. This selects the destination; it does not erase OAM.
+;
+; Access: Write-only, 8-bit
+;
+; ```text
+; 7  bit  0
+; ---- ----
+; AAAA AAAA
+; |||| ||||
+; ++++-++++- OAM word address, bits 0-7
+; ```
+;
+; [Nintendo manual](https://floating.muncher.se/bot/manual/book1_text.pdf#page=116)
+; [SNESdev reference](https://snes.nesdev.org/wiki/PPU_registers)
+.EQU OAMADDL      $2102
+
+; Name: Object Attribute Memory Address, High Byte (OAMADDH)
+;
+; Bit 0 supplies bit 8 of the OAM word address. Bit 7 enables sprite priority
+; rotation: when enabled, the OAM address selects which sprite is considered first.
+; Writing $00 disables rotation and clears the high address bit. Together with
+; OAMADDL = $00, this makes the next sprite upload start at the beginning of OAM.
+;
+; Access: Write-only, 8-bit
+;
+; ```text
+; 7  bit  0
+; ---- ----
+; P... ...A
+; |       |
+; |       +- OAM word address, bit 8
+; +--------- Priority rotation (0 = normal order, 1 = rotate using OAM address)
+; ```
+;
+; [Nintendo manual](https://floating.muncher.se/bot/manual/book1_text.pdf#page=116)
+; [SNESdev reference](https://snes.nesdev.org/wiki/PPU_registers)
+.EQU OAMADDH      $2103
 
 ; Name: Background Mode and Character Size (BGMODE)
 ;

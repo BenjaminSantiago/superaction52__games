@@ -27,7 +27,7 @@ Start:
 
     ;turn on the screen
     lda #$0F
-    sta REG_DISPCNT     
+    sta REG_DISPCNT    
 
 ;loop
 ;------------------------------------------

@@ -12,28 +12,23 @@
 .INCLUDE "inc/init.inc"
 .INCLUDE "inc/load_graphics.asm"
 
-;variables
+.INCLUDE "../../__inc/registers.inc"
+
+;VARIABLES
 ;---------------------------------------------------------------
+;sprites go from $0000 - $0220
+
 ;these two are to determine if the sprite should go 
-;go back or forth in each dimens`ion
+;go back or forth in each dimension
 .EQU Y_dir      $0221
 .EQU X_dir      $0222
 
-;this is a flag to determine if the background 
-;should be blue or not
-.EQU bg_flash   $0223
-
-;counter to inc and compare to if bg should be flashing or not
-.EQU bg_c       $0224
-
 ;variables for controller
-.EQU joy1H__c   $0225
-.EQU joy1H__p   $0226
-.EQU joy1H__h   $0227
+.EQU joy1H__c   $0223
+.EQU joy1H__p   $0224
+.EQU joy1H__h   $0225
 
-.EQU s1_speed   $0228
-
-
+.EQU s1_speed   $0226
 
 ;where the processor goes on reset
 ;---------------------------------------------------------------
@@ -49,8 +44,6 @@ Start:
     ;---------------------------------------------
     stz X_dir
     stz Y_dir
-    stz bg_flash
-    stz bg_c
 
     lda #$04
     sta s1_speed
@@ -59,19 +52,19 @@ Start:
     rep #$10    
     sep #$20
 
-    ;2105       --> BG MODE / character size
+    ;BG MODE / character size
     ;2105.b0    --> bg mode 1
-    ;2015.b3    --> character priority (I think this puts sprites above BGs?)
+    ;2015.b3    --> character priority
     lda #%00001001
-    sta $2105
+    sta BGMODE
 
-    ;initial bg color (white $7FFF)
+    ;initial bg color (0th color is white $7FFF)
     ;---------------------------------------------
-    stz $2121
+    stz CGADD
     lda #$FF
-    sta $2122
+    sta CGDATA
     lda #$7F
-    sta $2122
+    sta CGDATA
     
     ; Load Palette for our tiles
     ;---------------------------------------------
@@ -82,22 +75,21 @@ Start:
     ;---------------------------------------------
     LoadBlockToVRAM Sprite, $0000, $0800
 
-
     ;initialize sprites
     ;---------------------------------------------
     ;put RAM "copy" of sprites offscreen
     jsr SpriteInit    
 
     ;initialize sprite properties
-    ;set x (screen *.5 / width of sprite)
+    ;set x (screen *.5 / width of sprite*.5)
     lda #(256/2 - 16)
     sta $0000
     
-    ;set y (screen.height * .5/height of sprite)
+    ;set y (screen.height * .5/height of sprite*.5)
     lda #(224/2 - 16)
     sta $0001
     
-    ;first tile is zeroth one
+    ;first sprite is zeroth one
     stz $0002
 
     ;sprite_byte_3.b6   --> horizontal flip
@@ -114,37 +106,12 @@ Start:
 
     ;enable NMI and enable joypad
     lda #$81
-    sta $4200      
-
-
+    sta NMITIMEN
 
 ;main loop
 ;---------------------------------------------------------------
 Infinity:
     wai 
-
-    ;update values for background values
-    ;---------------------------------------------
-    ;see if bg_flash is 1 or 0
-    lda bg_flash
-    cmp #$01
-    bne +
-
-    ;see if counter is done
-    lda bg_c
-    cmp #$03
-    bne for
-
-    ;we are done so zero out counter
-    ;and bg flash variable
-    stz bg_c
-    stz bg_flash
-    bra +
-
-for:
-    ;(if counter isn't at the max, then inc)
-    inc bg_c
-+
 
 ;check directional controls
 ;---------------------------------------------
@@ -304,43 +271,45 @@ SetupVideo:
     rep #$10
     sep #$20
     
-    stz $2102
-    stz $2103
-    
     ;transfer sprite data into OAM
     ;----------------------------------
-	stz $2102		; set OAM address to 0
-	stz $2103
+    ; set OAM address to 0
+	stz OAMADDL		
+	stz OAMADDH
 
+    ; CPU -> PPU, auto increment, write 1 reg, $2104 (OAM Write)
 	LDY #$0400
-	STY $4300		; CPU -> PPU, auto increment, write 1 reg, $2104 (OAM Write)
+	STY DMAP0		
 
-	stz $4302
+    ; source offset
+	stz A1T0L 
+    stz A1T0H		
 
-	stz $4303		; source offset
-
+    ; number of bytes to transfer
 	LDY #$0220
-	STY $4305		; number of bytes to transfer
+	STY DAS0L		
 
+    ; bank address = $7E  (work RAM)
 	LDA #$7E
-	STA $4304		; bank address = $7E  (work RAM)
+	STA A1B0		
 
+    ; start DMA transfer
 	LDA #$01
-	STA $420B		;start DMA transfer
+	STA MDMAEN		
 	
 	lda #%10100000
-    sta $2101
+    sta OBJSEL
 
-    lda #%00010000      ;Enable BG1
-    sta $212C
+    ;Enable BG1
+    lda #%00010000      
+    sta TM
     
+    ;Turn on screen, full Brightness
     lda #$0F
-    sta $2100           ;Turn on screen, full Brightness
+    sta INIDISP          
 
     plp
     rts
-
-
 
 ;NMI (vblank) code
 ;---------------------------------------------------------------
@@ -352,67 +321,60 @@ VBlank:
     rep #$10    
     sep #$20
 
-    ;----------------------------------------
-    ;check if bg is flashing
-    lda bg_flash
-    cmp #$01
-    bne +
-
-    ;make BG blue ($72A5)
-    stz $2121
-    lda #$A5
-    sta $2122
-    lda #$72
-    sta $2122
-    jmp pre_setup
-
-+
-    ;otherwise set to white ($7FFF)
-    stz $2121
-    lda #$FF
-    sta $2122
-    lda #$7F
-    sta $2122    
-
 pre_setup:
     jsr SetupVideo
 
     ;get joypad status
 -
-    lda $4212
+    lda HVBJOY
     and #$01
     bne -
     
     ;read controller 1 high
+    ;get previous input
     ldy joy1H__c
-    lda $4219
+
+    ;get current input
+    lda JOY1H
+    ;store in c for "current"
     sta joy1H__c
+
+    ;put previous value into accumulator
     tya 
+    ;get any presses where the previous
+    ;and current differ
     eor joy1H__c
+    ;compare that result with current
+    ;get anything that is newly pressed
     and joy1H__c
+    ;store in p for "pressed"
     sta joy1H__p
+
+    ;bring back the previous state
     tya 
+    ;and to get anything the same
+    ;between previous and current frame
     and joy1H__c
+    ;store in h for "held"
     sta joy1H__h
 
-    lda $4210
+    lda RDNMI
 
-	PLY 
-	PLX 
-	PLA 
-
+    ply
+    plx
+    pla
+	
     sep #$20
-    RTI
+    rti
 
 ;---------------------------------------------------------------
 .ENDS
 
-;face graphic
+;face graphic and palette
 ;---------------------------------------------------------------
 .BANK 1 SLOT 0
 .ORG 0
 .SECTION "CharacterData"
-
 
 Sprite:
     .INCBIN "img/face__32x32__.pic"
