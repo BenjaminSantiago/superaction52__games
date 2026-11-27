@@ -1,8 +1,14 @@
 ;---------------------------------------------------------------
-; BLANK SNES game TEMPLATE
+; SNES GSS test
 ; by Benjamin Santiago
 
 ; description: 
+; get SNES GSS stuff to work. 
+; convert the c headers and asm to all assembly. 
+;
+; get data to load
+; play the music file (loop)
+; have sfx trigger via controller
 ;---------------------------------------------------------------
 
 ;includes
@@ -12,31 +18,43 @@
 
 ;code to start up SNES (clear registers)
 ;and macros for graphics
-.INCLUDE "inc/init.inc"
-.INCLUDE "inc/load_graphics.asm"
+.INCLUDE "../../__inc/init.inc"
+.INCLUDE "../../__inc/GFX.asm"
+.INCLUDE "../../__inc/registers.inc"
+
+;spc driver code
+;audio data (from SNES GSS)
+.INCLUDE "audio/sounds.asm"
+.INCLUDE "audio/SPC_communication.asm"
 
 ;"variables" and aliases
 ;---------------------------------------------------------------
 ; random-ness if needed
-.EQU rng            $0000
+.EQU rng            $0221
 
 ; controller values
 ; c is "current"
 ; p is "pressed"    (as in newly pressed since last read)
 ; h is "held"       (as in, held since the last read)
-.EQU joy1H__c       $0000
-.EQU joy1H__p       $0000
-.EQU joy1H__h       $0000
-.EQU joy1L__c       $0000
-.EQU joy1L__p       $0000
-.EQU joy1L__h       $0000
+.EQU joy1H__c       $0222
+.EQU joy1H__p       $0223
+.EQU joy1H__h       $0224
+.EQU joy1L__c       $0225
+.EQU joy1L__p       $0226
+.EQU joy1L__h       $0227
 
-.EQU joy2H__c       $0000
-.EQU joy2H__p       $0000
-.EQU joy2H__h       $0000
-.EQU joy2L__c       $0000
-.EQU joy2L__p       $0000
-.EQU joy2L__h       $0000
+.EQU joy2H__c       $0228
+.EQU joy2H__p       $0229
+.EQU joy2H__h       $022A
+.EQU joy2L__c       $022B
+.EQU joy2L__p       $022C
+.EQU joy2L__h       $022D
+
+.EQU spc_size              $022E
+.EQU spc_music_load_adr    $0230
+.EQU sneslib_ptr            $00
+.EQU gss_param              $04
+.EQU gss_command            $06
 ;---------------------------------------------------------------
 
 ;where the processor goes on reset
@@ -47,11 +65,35 @@
 
 Start:
     ;start up the SNES
+    ;set everything to known values
     INIT__snes 
 
+    jsl SPC__init
+
+    rep #$20
+    lda #127
+    pha 
+
+    lda #127
+    pha 
+
+    lda #SFX_DING
+    pha
+
+    lda #$00
+    pha
+
+    jsl SPC__sfx_play
+    pla
+    pla
+    pla
+    pla
+    sep #$20
+
     ;"initialize" the "variables"
+    ;(only non-zero ones)
     ;---------------------------------
-    stz rng
+    
     ;---------------------------------
 
     ;A/X/Y width (XY 16-bit & A 8-bit)   
@@ -66,10 +108,10 @@ Start:
     ;---------------------------------
 
     ;put WRAM "copy" of sprites offscreen
-    jsr SETUP__sprites  
+    jsr SETUP__sprites_offscreen
 
     ; Setup video modes and other stuff
-    jsr SETUP__video
+    jsr SETUP__sprites_to_OAM
 
     ; bg priorities
     ; and character sizes
@@ -121,7 +163,7 @@ FOREVER:
 ;(this is only in RAM, still has to be 
 ;transferred to the OAM)
 ;---------------------------------------------------------------
-SETUP__sprites:
+SETUP__sprites_offscreen:
 	php	
 
 	rep	#$30	;16bit mem/A, 16 bit X/Y
@@ -129,7 +171,7 @@ SETUP__sprites:
 	ldx #$0000
     lda #$0001
 _setoffscr:
-    sta $0000,X
+    sta $0400,X
     inx
     inx
     inx
@@ -140,7 +182,7 @@ _setoffscr:
 	ldx #$0000
 	lda #$5555
 _clr:
-	sta $0200, X		;initialize all sprites to be off the screen
+	sta $0600, X		;initialize all sprites to be off the screen
 	inx
 	inx
 	cpx #$0020
@@ -153,7 +195,7 @@ _clr:
 
 ;set up the "general video"-type registers
 ;---------------------------------------------------------------
-SETUP__video:
+SETUP__sprites_to_OAM:
     php
     
     ;set XY/A
@@ -171,8 +213,8 @@ SETUP__video:
 	sty DMAP0		
 
     ; source offset
-    stz A1T0L
-	stz A1T0H		
+    ldy #$0400
+	sty A1T0L
 
     ; number of bytes to transfer
     ldy #$0220
@@ -202,7 +244,7 @@ VBlank:
     rep #$10    
     sep #$20
 
-    jsr SETUP__video
+    jsr SETUP__sprites_to_OAM
 
     ;READ controllers
     ;-----------------------------
