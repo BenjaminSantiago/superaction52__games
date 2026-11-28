@@ -293,22 +293,97 @@ SPC__sfx_play:
 ; ------------------------------------------------
 
 ; ------------------------------------------------
+;void music_play(const unsigned char *data)
 SPC__music_play:
-    ;/*play music*/
-    ;void music_play(const unsigned char *data)
-    ;{
-    ;	static unsigned int size;
-    ;
-    ;	size=data[0]+(data[1]<<8);
-    ;
-    ;	nmi_enable(FALSE);
-    ;	
-    ;	spc_command(SCMD_MUSIC_STOP,0);
-    ;	spc_command(SCMD_LOAD,0);
-    ;	spc_load_data(spc_music_load_adr,size,data+2);
-    ;	spc_command(SCMD_MUSIC_PLAY,0);
-    ;	
-    ;	nmi_enable(TRUE);
-    ;}
+    
+    php
+    rep #$20 
+
+    ;static unsigned int size;
+    ;size=data[0]+(data[1]<<8);
+
+    lda 5,s   ; song address
+    sta.b sneslib_ptr
+
+    lda 7,s   ; song bank word
+    sta.b sneslib_ptr+2
+    
+    lda.b [sneslib_ptr]
+    sta spc_size
+    sep #$20 
+
+    ;nmi_enable(FALSE);
+    stz NMITIMEN
+    
+    ;spc_command(SCMD_MUSIC_STOP,0);
+    rep #$20
+    
+    lda #$0000
+    pha 
+
+    lda #SCMD_MUSIC_STOP
+    pha 
+
+    jsl SPC__command
+    pla
+    pla
+    sep #$20
+
+    ;spc_command(SCMD_LOAD,0);
+    rep #$20
+    
+    lda #$0000
+    pha 
+
+    lda #SCMD_LOAD
+    pha 
+
+    jsl SPC__command
+    pla
+    pla
+    sep #$20
+
+    ;spc_load_data(0x0200,size,spc700_code_1+2);
+    rep #$20
+    lda.b sneslib_ptr+2
+    pha 
+
+    lda.b sneslib_ptr
+    clc 
+    adc #2
+    pha 
+
+    lda spc_size
+    pha 
+
+    lda spc_music_load_adr
+    pha
+
+    jsl SPC__load_data
+    pla
+    pla
+    pla
+    pla
+    sep #$20
+
+    ;spc_command(SCMD_MUSIC_PLAY,0);
+    rep #$20
+    
+    lda #$0000
+    pha 
+
+    lda #SCMD_MUSIC_PLAY
+    pha 
+
+    jsl SPC__command
+    pla
+    pla
+    sep #$20
+
+    ;nmi_enable(TRUE);
+    lda #$81
+    sta NMITIMEN
+    
+    plp
     rtl
 

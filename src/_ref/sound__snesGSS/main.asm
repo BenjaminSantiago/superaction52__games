@@ -69,28 +69,20 @@ Start:
     INIT__snes 
 
     jsl SPC__init
-
+    
     rep #$20
-    lda #127
+
+    lda #:music_1_data
     pha 
 
-    lda #127
+    lda #music_1_data
     pha 
 
-    lda #SFX_DING
-    pha
-
-    lda #$00
-    pha
-
-    jsl SPC__sfx_play
-    pla
-    pla
+    jsl SPC__music_play
     pla
     pla
     sep #$20
-
-    ;"initialize" the "variables"
+   ;"initialize" the "variables"
     ;(only non-zero ones)
     ;---------------------------------
     
@@ -152,6 +144,14 @@ FOREVER:
     sta rng
     ;-----------------------------------------
 
+    ;-----------------------------------------
+@controls__start_check:
+    lda joy1H__c
+    and #%00010000
+    beq FOREVER
+
+    jsr PLAY__ding
+    ;-----------------------------------------
 
     jmp FOREVER    ;<-- we outttttt t t t t t t t
 ;---------------------------------------------------------------
@@ -233,6 +233,33 @@ SETUP__sprites_to_OAM:
     rts
 ;---------------------------------------------------------------
 
+;---------------------------------------------------------------
+PLAY__ding:
+    php
+
+    rep #$20
+    lda #127
+    pha 
+
+    lda #127
+    pha 
+
+    lda #SFX_DING
+    pha
+
+    lda #$06
+    pha
+
+    jsl SPC__sfx_play
+    pla 
+    pla
+    pla
+    pla
+    sep #$20
+    
+    plp
+    rts
+;---------------------------------------------------------------
 
 ;NMI (vblank) interrupt code
 ;---------------------------------------------------------------
